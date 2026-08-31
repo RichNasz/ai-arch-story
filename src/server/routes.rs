@@ -3,7 +3,10 @@ use std::fs;
 use axum::{
     Router,
     Json,
-    extract::{FromRequestParts, Path, RawPathParams, State},
+    extract::{
+        FromRequestParts, Multipart, Path, RawPathParams, State,
+        multipart::MultipartRejection,
+    },
     http::{StatusCode, request::Parts},
     routing::{delete, get, post},
 };
@@ -126,6 +129,7 @@ pub fn api_router() -> Router<AppState> {
     Router::new()
         .route("/project", get(get_project))
         .route("/shared/branding", get(get_shared_branding).put(put_shared_branding))
+        .route("/shared/theme", get(get_shared_theme).put(put_shared_theme))
         .route("/types", get(get_resolved_types))
         .route("/project/types", get(get_project_types).put(put_project_types))
         .route("/project/shapes", get(list_shapes).post(upload_shape))
@@ -173,6 +177,50 @@ async fn put_shared_branding(
     let dir = state.workspace_root.join("shared");
     fs::create_dir_all(&dir).map_err(|e| error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e)))?;
     write_json(&dir.join("branding.json"), &value)?;
+    Ok(Json(value))
+}
+
+async fn get_shared_theme(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    let path = state.workspace_root.join("shared").join("theme.json");
+    let content = fs::read_to_string(&path).map_err(|_| {
+        error_response(
+            StatusCode::NOT_FOUND,
+            "NOT_FOUND",
+            "No shared/theme.json found".to_string(),
+        )
+    })?;
+    let value = serde_json::from_str(&content).map_err(|e| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "PARSE_ERROR",
+            format!("{e}"),
+        )
+    })?;
+    Ok(Json(value))
+}
+
+async fn put_shared_theme(
+    State(state): State<AppState>,
+    Json(value): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    if !value.is_object() {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_THEME",
+            "Theme must be a JSON object".to_string(),
+        ));
+    }
+    let dir = state.workspace_root.join("shared");
+    fs::create_dir_all(&dir).map_err(|e| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "IO_ERROR",
+            format!("{e}"),
+        )
+    })?;
+    write_json(&dir.join("theme.json"), &value)?;
     Ok(Json(value))
 }
 
@@ -306,21 +354,88 @@ async fn list_shapes(
     Ok(Json(ShapeListResponse { shapes }))
 }
 
-#[derive(Deserialize)]
-struct UploadShapeRequest {
-    name: String,
-    svg: String,
-}
-
 async fn upload_shape(
     State(state): State<AppState>,
-    Json(req): Json<UploadShapeRequest>,
+    multipart: Result<Multipart, MultipartRejection>,
 ) -> Result<(StatusCode, Json<ShapeListEntry>), (StatusCode, Json<ErrorResponse>)> {
-    if req.name.is_empty() || req.name.contains('/') || req.name.contains('\\') {
-        return Err(error_response(StatusCode::BAD_REQUEST, "INVALID_NAME", "Invalid shape name".to_string()));
+    let mut multipart = multipart.map_err(|e| {
+        error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_MULTIPART",
+            format!("Invalid multipart shape upload: {e}"),
+        )
+    })?;
+    let mut name = None;
+    let mut svg = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_MULTIPART",
+            format!("Invalid multipart shape upload: {e}"),
+        )
+    })? {
+        match field.name() {
+            Some("name") if name.is_none() => {
+                name = Some(field.text().await.map_err(|e| {
+                    error_response(
+                        StatusCode::BAD_REQUEST,
+                        "INVALID_MULTIPART",
+                        format!("Invalid shape name field: {e}"),
+                    )
+                })?);
+            }
+            Some("file") if svg.is_none() => {
+                let is_svg_file = field
+                    .file_name()
+                    .is_some_and(|file_name| file_name.to_ascii_lowercase().ends_with(".svg"));
+                let is_svg_media_type = field.content_type() == Some("image/svg+xml");
+                if !is_svg_file || !is_svg_media_type {
+                    return Err(invalid_svg_response());
+                }
+                let bytes = field.bytes().await.map_err(|e| {
+                    error_response(
+                        StatusCode::BAD_REQUEST,
+                        "INVALID_MULTIPART",
+                        format!("Invalid SVG file field: {e}"),
+                    )
+                })?;
+                svg = Some(String::from_utf8(bytes.to_vec()).map_err(|_| invalid_svg_response())?);
+            }
+            _ => {
+                return Err(error_response(
+                    StatusCode::BAD_REQUEST,
+                    "INVALID_MULTIPART",
+                    "Shape upload requires one name field and one file field".to_string(),
+                ));
+            }
+        }
     }
-    if !req.svg.contains("<svg") {
-        return Err(error_response(StatusCode::BAD_REQUEST, "INVALID_SVG", "Content does not appear to be SVG".to_string()));
+
+    let name = name.ok_or_else(|| {
+        error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_MULTIPART",
+            "Shape upload is missing the name field".to_string(),
+        )
+    })?;
+    let svg = svg.ok_or_else(|| {
+        error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_MULTIPART",
+            "Shape upload is missing the file field".to_string(),
+        )
+    })?;
+
+    if !is_safe_shape_name(&name) {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_NAME",
+            "Invalid shape name".to_string(),
+        ));
+    }
+    if !is_safe_svg(&svg) {
+        return Err(invalid_svg_response());
     }
 
     let dir = state.workspace_root.join("shared").join("shapes");
@@ -328,18 +443,118 @@ async fn upload_shape(
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e))
     })?;
 
-    let path = dir.join(format!("{}.svg", req.name));
-    fs::write(&path, &req.svg).map_err(|e| {
+    let path = dir.join(format!("{name}.svg"));
+    fs::write(&path, &svg).map_err(|e| {
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e))
     })?;
 
-    Ok((StatusCode::CREATED, Json(ShapeListEntry { name: req.name })))
+    Ok((StatusCode::CREATED, Json(ShapeListEntry { name })))
+}
+
+fn invalid_svg_response() -> (StatusCode, Json<ErrorResponse>) {
+    error_response(
+        StatusCode::BAD_REQUEST,
+        "INVALID_SVG",
+        "File must be a safe SVG with a viewBox".to_string(),
+    )
+}
+
+fn is_safe_shape_name(value: &str) -> bool {
+    let mut bytes = value.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
+        return false;
+    }
+
+    let mut previous_was_hyphen = false;
+    for byte in bytes {
+        match byte {
+            b'a'..=b'z' | b'0'..=b'9' => previous_was_hyphen = false,
+            b'-' if !previous_was_hyphen => previous_was_hyphen = true,
+            _ => return false,
+        }
+    }
+    !previous_was_hyphen
+}
+
+fn is_safe_svg(svg: &str) -> bool {
+    let trimmed = svg.trim();
+    let root = if let Some(after_declaration) = trimmed.strip_prefix("<?xml") {
+        let Some(end) = after_declaration.find("?>") else {
+            return false;
+        };
+        after_declaration[end + 2..].trim_start()
+    } else {
+        trimmed
+    };
+    let Some(root_end) = root.find('>') else {
+        return false;
+    };
+    let opening_tag = &root[..=root_end];
+    let opening_tag_lower = opening_tag.to_ascii_lowercase();
+    if !opening_tag_lower.starts_with("<svg")
+        || !opening_tag_lower
+            .as_bytes()
+            .get(4)
+            .is_some_and(|byte| byte.is_ascii_whitespace() || *byte == b'>')
+        || !has_attribute(&opening_tag_lower, "viewbox")
+        || !root.trim_end().to_ascii_lowercase().ends_with("</svg>")
+    {
+        return false;
+    }
+
+    let lower = root.to_ascii_lowercase();
+    let forbidden = [
+        "<script",
+        "<foreignobject",
+        "<iframe",
+        "<object",
+        "<embed",
+        "<image",
+        "<use",
+        "<style",
+        "<!doctype",
+        "<!entity",
+        "<?xml-stylesheet",
+        "javascript:",
+    ];
+    !forbidden.iter().any(|value| lower.contains(value)) && !has_event_attribute(&lower)
+}
+
+fn has_attribute(opening_tag: &str, attribute: &str) -> bool {
+    opening_tag.match_indices(attribute).any(|(index, _)| {
+        let before = opening_tag.as_bytes().get(index.wrapping_sub(1));
+        let after = opening_tag.as_bytes().get(index + attribute.len());
+        before.is_some_and(u8::is_ascii_whitespace)
+            && after.is_some_and(|byte| byte.is_ascii_whitespace() || *byte == b'=')
+    })
+}
+
+fn has_event_attribute(svg: &str) -> bool {
+    svg.split('<').skip(1).any(|element| {
+        let tag = element.split_once('>').map_or(element, |(tag, _)| tag);
+        tag.split_ascii_whitespace().skip(1).any(|attribute| {
+            let name = attribute.split_once('=').map_or(attribute, |(name, _)| name);
+            name.len() > 2
+                && name.starts_with("on")
+                && name[2..].bytes().all(|byte| byte.is_ascii_alphabetic())
+        })
+    })
 }
 
 async fn delete_shape(
     State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    if !is_safe_shape_name(&name) {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_NAME",
+            "Invalid shape name".to_string(),
+        ));
+    }
     let path = state.workspace_root.join("shared").join("shapes").join(format!("{}.svg", name));
     if !path.exists() {
         return Err(error_response(StatusCode::NOT_FOUND, "NOT_FOUND", format!("Shape '{}' not found", name)));

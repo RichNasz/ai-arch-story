@@ -3,9 +3,10 @@ import type { Diagram, DiagramListEntry, DiagramNode, DiagramEdge, DiagramFlow, 
 const BASE = '/api/v1';
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && opts?.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', ...opts?.headers },
+    headers: isFormData ? opts?.headers : { 'Content-Type': 'application/json', ...opts?.headers },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -147,11 +148,15 @@ export const api = {
   listShapes: () =>
     request<{ shapes: { name: string }[] }>('/project/shapes').then(r => r.shapes),
 
-  uploadShape: (name: string, svg: string) =>
-    request<{ name: string }>('/project/shapes', {
+  uploadShape: (name: string, svg: string) => {
+    const form = new FormData();
+    form.append('name', name);
+    form.append('file', new Blob([svg], { type: 'image/svg+xml' }), `${name}.svg`);
+    return request<{ name: string }>('/project/shapes', {
       method: 'POST',
-      body: JSON.stringify({ name, svg }),
-    }),
+      body: form,
+    });
+  },
 
   deleteShape: (name: string) =>
     request<void>(`/project/shapes/${name}`, { method: 'DELETE' }),

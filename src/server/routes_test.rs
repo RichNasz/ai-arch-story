@@ -49,12 +49,22 @@ impl Drop for TestWorkspace {
 }
 
 async fn request(app: Router, method: &str, uri: String, body: Body) -> (StatusCode, String) {
+    request_with_content_type(app, method, uri, "application/json", body).await
+}
+
+async fn request_with_content_type(
+    app: Router,
+    method: &str,
+    uri: String,
+    content_type: &str,
+    body: Body,
+) -> (StatusCode, String) {
     let response = app
         .oneshot(
             Request::builder()
                 .method(method)
                 .uri(uri)
-                .header("content-type", "application/json")
+                .header("content-type", content_type)
                 .body(body)
                 .expect("build route request"),
         )
@@ -68,6 +78,349 @@ async fn request(app: Router, method: &str, uri: String, body: Body) -> (StatusC
         status,
         String::from_utf8(body.to_vec()).expect("response is UTF-8"),
     )
+}
+
+fn multipart_shape_body(
+    boundary: &str,
+    name: &str,
+    file_name: &str,
+    content_type: &str,
+    content: &str,
+) -> String {
+    format!(
+        "--{boundary}\r\n\
+         Content-Disposition: form-data; name=\"name\"\r\n\r\n\
+         {name}\r\n\
+         --{boundary}\r\n\
+         Content-Disposition: form-data; name=\"file\"; filename=\"{file_name}\"\r\n\
+         Content-Type: {content_type}\r\n\r\n\
+         {content}\r\n\
+         --{boundary}--\r\n"
+    )
+}
+
+#[tokio::test]
+async fn shared_theme_round_trips_an_object_and_persists_it() {
+    // Removing either theme route or its persisted write must make this test fail.
+    let workspace = TestWorkspace::new();
+    let theme = serde_json::json!({
+        "light": { "background": "#ffffff", "text": "#111827" },
+        "dark": { "background": "#111827", "text": "#ffffff" }
+    });
+
+    let (put_status, put_response) = request(
+        workspace.app(),
+        "PUT",
+        "/shared/theme".to_string(),
+        Body::from(theme.to_string()),
+    )
+    .await;
+    assert_eq!(put_status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&put_response).expect("PUT response is JSON"),
+        theme
+    );
+
+    let (get_status, get_response) = request(
+        workspace.app(),
+        "GET",
+        "/shared/theme".to_string(),
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(get_status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&get_response).expect("GET response is JSON"),
+        theme
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(
+            &fs::read_to_string(workspace.root.join("shared/theme.json"))
+                .expect("read persisted theme")
+        )
+        .expect("persisted theme is JSON"),
+        theme
+    );
+}
+
+#[tokio::test]
+async fn shared_theme_rejects_a_non_object_without_overwriting_the_file() {
+    // Accepting a non-object theme or changing the prior file must make this test fail.
+    let workspace = TestWorkspace::new();
+    let shared = workspace.root.join("shared");
+    fs::create_dir_all(&shared).expect("create shared directory");
+    let original = serde_json::json!({ "light": { "background": "#ffffff" } });
+    fs::write(shared.join("theme.json"), original.to_string()).expect("seed theme");
+
+    let (status, response) = request(
+        workspace.app(),
+        "PUT",
+        "/shared/theme".to_string(),
+        Body::from("[]"),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&response).expect("error response is JSON")["error"]
+            ["code"],
+        "INVALID_THEME"
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(
+            &fs::read_to_string(shared.join("theme.json")).expect("read unchanged theme")
+        )
+        .expect("stored theme is JSON"),
+        original
+    );
+}
+
+#[tokio::test]
+async fn project_shape_upload_accepts_a_multipart_svg_file() {
+    // Reverting this endpoint to JSON or failing to persist the file must make this test fail.
+    let workspace = TestWorkspace::new();
+    let boundary = "shape-upload-boundary";
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M0 0h100v100H0z" fill="currentColor"/></svg>"#;
+    let body = multipart_shape_body(
+        boundary,
+        "cloud-native",
+        "cloud-native.svg",
+        "image/svg+xml",
+        svg,
+    );
+
+    let (status, response) = request_with_content_type(
+        workspace.app(),
+        "POST",
+        "/project/shapes".to_string(),
+        &format!("multipart/form-data; boundary={boundary}"),
+        Body::from(body),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&response).expect("upload response is JSON"),
+        serde_json::json!({ "name": "cloud-native" })
+    );
+    assert_eq!(
+        fs::read_to_string(workspace.root.join("shared/shapes/cloud-native.svg"))
+            .expect("read uploaded shape"),
+        svg
+    );
+
+    let (list_status, list_response) = request(
+        workspace.app(),
+        "GET",
+        "/project/shapes".to_string(),
+        Body::empty(),
+    )
+    .await;
+    assert_eq!(list_status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&list_response)
+            .expect("shape list response is JSON"),
+        serde_json::json!({ "shapes": [{ "name": "cloud-native" }] })
+    );
+}
+
+#[tokio::test]
+async fn project_shape_upload_rejects_non_svg_content_without_writing_a_file() {
+    // Trusting only the multipart filename or media type must make this test fail.
+    let workspace = TestWorkspace::new();
+    let boundary = "invalid-shape-boundary";
+    let body = multipart_shape_body(
+        boundary,
+        "not-a-shape",
+        "not-a-shape.svg",
+        "image/svg+xml",
+        "<html>not an SVG</html>",
+    );
+
+    let (status, response) = request_with_content_type(
+        workspace.app(),
+        "POST",
+        "/project/shapes".to_string(),
+        &format!("multipart/form-data; boundary={boundary}"),
+        Body::from(body),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&response).expect("error response is JSON")["error"]
+            ["code"],
+        "INVALID_SVG"
+    );
+    assert!(!workspace.root.join("shared/shapes/not-a-shape.svg").exists());
+}
+
+#[tokio::test]
+async fn project_shape_upload_rejects_svg_without_a_view_box() {
+    // Accepting an SVG that the renderer cannot scale must make this test fail.
+    let workspace = TestWorkspace::new();
+    let boundary = "missing-view-box-boundary";
+    let body = multipart_shape_body(
+        boundary,
+        "unscalable",
+        "unscalable.svg",
+        "image/svg+xml",
+        "<svg><path d=\"M0 0h10v10H0z\"/></svg>",
+    );
+
+    let (status, response) = request_with_content_type(
+        workspace.app(),
+        "POST",
+        "/project/shapes".to_string(),
+        &format!("multipart/form-data; boundary={boundary}"),
+        Body::from(body),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&response).expect("error response is JSON")["error"]
+            ["code"],
+        "INVALID_SVG"
+    );
+    assert!(!workspace.root.join("shared/shapes/unscalable.svg").exists());
+}
+
+#[tokio::test]
+async fn project_shape_upload_rejects_active_or_external_svg_content() {
+    // Persisting executable or externally referenced SVG markup must make this test fail.
+    let workspace = TestWorkspace::new();
+
+    for (index, svg) in [
+        r#"<svg viewBox="0 0 10 10"><script>alert(1)</script></svg>"#,
+        r#"<svg viewBox="0 0 10 10" onload="alert(1)"><path d="M0 0h10v10H0z"/></svg>"#,
+        r#"<svg viewBox="0 0 10 10"><use href="https://example.com/shape.svg#x"/></svg>"#,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let boundary = format!("active-svg-boundary-{index}");
+        let body = multipart_shape_body(
+            &boundary,
+            &format!("unsafe-content-{index}"),
+            "unsafe.svg",
+            "image/svg+xml",
+            svg,
+        );
+        let (status, response) = request_with_content_type(
+            workspace.app(),
+            "POST",
+            "/project/shapes".to_string(),
+            &format!("multipart/form-data; boundary={boundary}"),
+            Body::from(body),
+        )
+        .await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&response)
+                .expect("error response is JSON")["error"]["code"],
+            "INVALID_SVG"
+        );
+    }
+}
+
+#[tokio::test]
+async fn project_shape_upload_returns_json_for_malformed_multipart() {
+    // Letting extractor failures bypass the API error envelope must make this test fail.
+    let workspace = TestWorkspace::new();
+    let (status, response) = request_with_content_type(
+        workspace.app(),
+        "POST",
+        "/project/shapes".to_string(),
+        "multipart/form-data",
+        Body::from("not multipart"),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&response).expect("error response is JSON")["error"]
+            ["code"],
+        "INVALID_MULTIPART"
+    );
+}
+
+#[tokio::test]
+async fn project_shape_upload_rejects_unsafe_names_without_writing_files() {
+    // Allowing any name outside the kebab-case asset contract must make this test fail.
+    let workspace = TestWorkspace::new();
+    let svg = r#"<svg viewBox="0 0 10 10"><path d="M0 0h10v10H0z"/></svg>"#;
+
+    for (index, name) in [
+        "../escape",
+        "nested/shape",
+        r"nested\shape",
+        "shape.svg",
+        "Uppercase",
+        "two--hyphens",
+        "-leading",
+        "trailing-",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let boundary = format!("unsafe-shape-boundary-{index}");
+        let body = multipart_shape_body(&boundary, name, "shape.svg", "image/svg+xml", svg);
+        let (status, response) = request_with_content_type(
+            workspace.app(),
+            "POST",
+            "/project/shapes".to_string(),
+            &format!("multipart/form-data; boundary={boundary}"),
+            Body::from(body),
+        )
+        .await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST, "must reject {name:?}");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&response)
+                .expect("error response is JSON")["error"]["code"],
+            "INVALID_NAME",
+            "must use the shape-name error contract for {name:?}"
+        );
+    }
+
+    assert!(!workspace.root.join("escape.svg").exists());
+    let shapes = workspace.root.join("shared/shapes");
+    assert!(
+        !shapes.exists()
+            || fs::read_dir(shapes)
+                .expect("read shapes directory")
+                .next()
+                .is_none(),
+        "unsafe uploads must not create shape files"
+    );
+}
+
+#[tokio::test]
+async fn project_shape_delete_rejects_percent_decoded_traversal() {
+    // Joining an unvalidated delete name must make this test fail by removing the sibling file.
+    let workspace = TestWorkspace::new();
+    let shared = workspace.root.join("shared");
+    fs::create_dir_all(shared.join("shapes")).expect("create shapes directory");
+    let sibling = shared.join("protected.svg");
+    fs::write(&sibling, "protected").expect("seed sibling file");
+
+    let (status, response) = request(
+        workspace.app(),
+        "DELETE",
+        "/project/shapes/%2E%2E%2Fprotected".to_string(),
+        Body::empty(),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&response).expect("error response is JSON")["error"]
+            ["code"],
+        "INVALID_NAME"
+    );
+    assert!(sibling.is_file(), "unsafe delete must preserve the sibling file");
 }
 
 async fn assert_invalid_name(workspace: &TestWorkspace, method: &str, uri: String, body: Body) {
