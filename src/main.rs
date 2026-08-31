@@ -2,6 +2,7 @@ mod schema;
 mod layout;
 mod render;
 mod export;
+mod bootstrap;
 mod workspace;
 mod server;
 
