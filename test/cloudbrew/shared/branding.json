@@ -1,21 +1,17 @@
 {
-  "organization": "Red Hat",
+  "organization": "CloudBrew",
   "logo": {
     "src": "logo.svg",
-    "alt": "Red Hat logo",
+    "alt": "CloudBrew logo",
     "placement": "header",
-    "height": 32
+    "height": 28
   },
   "colors": {
-    "primary": "#EE0000",
-    "secondary": "#292929"
-  },
-  "typography": {
-    "fontFamily": "\"Red Hat Display\", \"Red Hat Text\", sans-serif",
-    "monoFontFamily": "\"Red Hat Mono\", monospace"
+    "primary": "#2563A8",
+    "secondary": "#173B5E"
   },
   "footer": {
-    "text": "Red Hat — CloudBrew Architecture Team",
+    "text": "CloudBrew architecture examples",
     "showGeneratedDate": true
   }
 }

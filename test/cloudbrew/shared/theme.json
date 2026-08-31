@@ -23,6 +23,6 @@
     }
   },
   "typography": {
-    "fontFamily": "\"Red Hat Display\", \"Red Hat Text\", -apple-system, BlinkMacSystemFont, sans-serif"
+    "fontFamily": "system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
   }
 }

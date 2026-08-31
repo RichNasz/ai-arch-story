@@ -1,0 +1,21 @@
+# Source-control and local agent configuration
+.git
+.github
+.ai
+.codex
+.mcp.json
+.superpowers
+
+# Local configuration and operating-system files
+.env
+.env.*
+.DS_Store
+
+# Generated files and local dependencies
+target
+webapp/node_modules
+webapp/dist
+output
+
+# Fixtures are mounted only for smoke tests and are not Containerfile inputs.
+test
