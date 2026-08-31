@@ -5,9 +5,8 @@
 AI Arch Story is a public, Apache License 2.0 open-source project. GitHub at
 `https://github.com/RichNasz/ai-arch-story` is its canonical source repository.
 
-The initial public baseline establishes licensing, discoverability, and
-continuous verification. It does not claim that a container image has been
-published or that the project has a supported release channel.
+The active-development baseline establishes licensing, discoverability,
+continuous verification, and a development container image.
 
 ## Why
 
@@ -38,14 +37,18 @@ A GitHub Actions workflow runs on pull requests and pushes to `main`. It must:
    test suite; and
 3. build the `Containerfile` as a container-image verification step.
 
-The workflow must not publish a container image, create a GitHub Release, or
-add registry/download/release badges. It may use GitHub-hosted runners and
-public upstream actions necessary to perform those checks.
+On successful pushes to `main`, the workflow publishes the development image
+`ghcr.io/richnasz/ai-arch-story:main`. It uses GitHub's ephemeral token with
+only `contents: read` and `packages: write` permissions. Pull-request runs
+verify builds but never publish an image, create a GitHub Release, or add
+registry/download/release badges.
 
 ## Deferred Container Publication
 
-The distribution container remains a local-image artifact until a separate
-release specification defines all of the following:
+`main` is a mutable active-development tag, not a release or compatibility
+promise. A separate release specification is still required before adding
+immutable version tags, `latest`, or GitHub Releases. That specification must
+define:
 
 - registry identity and public/private access policy;
 - semantic-versioning and tag policy, including the meaning of `latest`;
