@@ -3,3 +3,4 @@
 /webapp/dist
 .DS_Store
 output/
+.worktrees/
