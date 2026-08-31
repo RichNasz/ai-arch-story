@@ -1,5 +1,7 @@
 mod state;
 mod routes;
+#[cfg(test)]
+mod routes_test;
 
 use std::path::PathBuf;
 
