@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::{self, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
 };
@@ -13,7 +14,7 @@ use tower::ServiceExt;
 
 use super::{
     routes::api_router,
-    state::{AppState, atomic_write_json},
+    state::{AppState, AtomicJsonWriteError, atomic_write_json},
 };
 
 static NEXT_WORKSPACE: AtomicUsize = AtomicUsize::new(0);
@@ -243,6 +244,61 @@ async fn invalid_diagram_name_takes_precedence_over_diagram_validation() {
     .await;
 }
 
+#[tokio::test]
+async fn invalid_diagram_name_takes_precedence_over_malformed_json() {
+    // Running JSON extraction before route-name validation must make this test fail.
+    let workspace = TestWorkspace::new();
+    assert_invalid_name(
+        &workspace,
+        "PUT",
+        "/diagrams/..".to_string(),
+        Body::from("{"),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn list_diagrams_omits_invalid_on_disk_directory_names() {
+    // Returning an invalid on-disk directory as a diagram must make this test fail.
+    let workspace = TestWorkspace::new();
+    let definition = serde_json::json!({
+        "version": "1.0",
+        "title": "Listed",
+        "theme": "default",
+        "nodes": [],
+        "edges": [],
+        "flows": [],
+        "groups": []
+    })
+    .to_string();
+    for name in ["system-overview", "invalid_name"] {
+        let directory = workspace.root.join("diagrams").join(name);
+        fs::create_dir_all(&directory).expect("create diagram directory");
+        fs::write(directory.join("diagram.json"), &definition).expect("write diagram fixture");
+    }
+
+    let (status, response) = request(
+        workspace.app(),
+        "GET",
+        "/diagrams".to_string(),
+        Body::empty(),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    let response: serde_json::Value =
+        serde_json::from_str(&response).expect("diagram list response is JSON");
+    assert_eq!(
+        response["diagrams"]
+            .as_array()
+            .expect("diagrams is an array")
+            .iter()
+            .map(|diagram| diagram["name"].as_str().expect("diagram name"))
+            .collect::<Vec<_>>(),
+        vec!["system-overview"]
+    );
+}
+
 struct FailingJson;
 
 impl serde::Serialize for FailingJson {
@@ -275,6 +331,53 @@ fn atomic_json_write_removes_temporary_file_after_serialization_failure() {
             .is_none(),
         "atomic write failure must remove its temporary sibling"
     );
+}
+
+#[test]
+fn atomic_json_write_removes_temporary_file_after_rename_failure() {
+    // Leaving a temporary sibling after rename fails must make this test fail.
+    let workspace = TestWorkspace::new();
+    let shared = workspace.root.join("shared");
+    fs::create_dir_all(&shared).expect("create shared directory");
+    let destination = shared.join("branding.json");
+    fs::create_dir(&destination).expect("create directory that rename cannot replace with a file");
+
+    assert!(atomic_write_json(&destination, &serde_json::json!({})).is_err());
+    assert!(destination.is_dir());
+    assert_eq!(
+        fs::read_dir(&shared)
+            .expect("read shared directory")
+            .count(),
+        1,
+        "rename failure must remove its temporary sibling"
+    );
+}
+
+struct FailingWriter;
+
+impl Write for FailingWriter {
+    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+        Err(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "injected writer failure",
+        ))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn serde_json_writer_errors_map_to_io_errors() {
+    // Classifying serde_json-wrapped writer failures as serialization errors must fail this test.
+    let serde_error = serde_json::to_writer(FailingWriter, &serde_json::json!({ "key": "value" }))
+        .expect_err("writer must fail");
+
+    assert!(matches!(
+        AtomicJsonWriteError::from(serde_error),
+        AtomicJsonWriteError::Io(_)
+    ));
 }
 
 #[tokio::test]

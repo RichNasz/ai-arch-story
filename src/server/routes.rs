@@ -3,8 +3,8 @@ use std::fs;
 use axum::{
     Router,
     Json,
-    extract::{Path, State},
-    http::StatusCode,
+    extract::{FromRequestParts, Path, RawPathParams, State},
+    http::{StatusCode, request::Parts},
     routing::{delete, get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,39 @@ fn diagram_paths(
             format!("Invalid diagram name '{}'", name),
         )
     })
+}
+
+struct ValidatedDiagramName(String);
+
+impl FromRequestParts<AppState> for ValidatedDiagramName {
+    type Rejection = (StatusCode, Json<ErrorResponse>);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let params = RawPathParams::from_request_parts(parts, state)
+            .await
+            .map_err(|_| {
+                error_response(
+                    StatusCode::BAD_REQUEST,
+                    "INVALID_DIAGRAM_NAME",
+                    "Invalid diagram name".to_string(),
+                )
+            })?;
+        let name = params
+            .iter()
+            .find_map(|(key, value)| (key == "name").then_some(value))
+            .ok_or_else(|| {
+                error_response(
+                    StatusCode::BAD_REQUEST,
+                    "INVALID_DIAGRAM_NAME",
+                    "Invalid diagram name".to_string(),
+                )
+            })?;
+        diagram_paths(state, name)?;
+        Ok(Self(name.to_string()))
+    }
 }
 
 fn write_json<T: Serialize + ?Sized>(
@@ -230,7 +263,7 @@ async fn get_diagram_custom_types(
 
 async fn put_diagram_custom_types(
     State(state): State<AppState>,
-    Path(name): Path<String>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
     Json(types): Json<CustomTypes>,
 ) -> Result<Json<CustomTypes>, (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -344,7 +377,10 @@ async fn list_diagrams(State(state): State<AppState>) -> Result<Json<DiagramList
                 continue;
             }
             let name = entry.file_name().to_string_lossy().to_string();
-            let diagram_path = entry.path().join("diagram.json");
+            let Ok(paths) = state.diagram_paths(&name) else {
+                continue;
+            };
+            let diagram_path = paths.definition();
             if !diagram_path.exists() {
                 continue;
             }
@@ -355,7 +391,7 @@ async fn list_diagrams(State(state): State<AppState>) -> Result<Json<DiagramList
                 .map(|d| d.title)
                 .unwrap_or_else(|| name.clone());
 
-            let has_output = entry.path().join("output").exists();
+            let has_output = paths.output_directory().exists();
 
             entries.push(DiagramListEntry { name, title, has_output });
         }
@@ -377,10 +413,9 @@ async fn get_diagram(
 
 async fn put_diagram(
     State(state): State<AppState>,
-    Path(name): Path<String>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
     Json(diagram): Json<Diagram>,
 ) -> Result<Json<Diagram>, (StatusCode, Json<ErrorResponse>)> {
-    diagram_paths(&state, &name)?;
     validate(&diagram)?;
     write_diagram(&state, &name, &diagram)?;
     Ok(Json(diagram))
@@ -549,7 +584,7 @@ async fn get_node(
 
 async fn add_node(
     State(state): State<AppState>,
-    Path(name): Path<String>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
     Json(node): Json<Node>,
 ) -> Result<(StatusCode, Json<Node>), (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -564,7 +599,8 @@ async fn add_node(
 
 async fn update_node(
     State(state): State<AppState>,
-    Path((name, id)): Path<(String, String)>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
+    Path((_, id)): Path<(String, String)>,
     Json(node): Json<Node>,
 ) -> Result<Json<Node>, (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -632,7 +668,7 @@ async fn get_edge(
 
 async fn add_edge(
     State(state): State<AppState>,
-    Path(name): Path<String>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
     Json(edge): Json<Edge>,
 ) -> Result<(StatusCode, Json<Edge>), (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -647,7 +683,8 @@ async fn add_edge(
 
 async fn update_edge(
     State(state): State<AppState>,
-    Path((name, id)): Path<(String, String)>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
+    Path((_, id)): Path<(String, String)>,
     Json(edge): Json<Edge>,
 ) -> Result<Json<Edge>, (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -703,7 +740,7 @@ async fn get_flow(
 
 async fn add_flow(
     State(state): State<AppState>,
-    Path(name): Path<String>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
     Json(flow): Json<Flow>,
 ) -> Result<(StatusCode, Json<Flow>), (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -718,7 +755,8 @@ async fn add_flow(
 
 async fn update_flow(
     State(state): State<AppState>,
-    Path((name, id)): Path<(String, String)>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
+    Path((_, id)): Path<(String, String)>,
     Json(flow): Json<Flow>,
 ) -> Result<Json<Flow>, (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -768,7 +806,7 @@ async fn get_group(
 
 async fn add_group(
     State(state): State<AppState>,
-    Path(name): Path<String>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
     Json(group): Json<Group>,
 ) -> Result<(StatusCode, Json<Group>), (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;
@@ -783,7 +821,8 @@ async fn add_group(
 
 async fn update_group(
     State(state): State<AppState>,
-    Path((name, id)): Path<(String, String)>,
+    ValidatedDiagramName(name): ValidatedDiagramName,
+    Path((_, id)): Path<(String, String)>,
     Json(group): Json<Group>,
 ) -> Result<Json<Group>, (StatusCode, Json<ErrorResponse>)> {
     let mut diagram = read_diagram(&state, &name)?;

@@ -127,7 +127,12 @@ impl Error for AtomicJsonWriteError {
 
 impl From<serde_json::Error> for AtomicJsonWriteError {
     fn from(error: serde_json::Error) -> Self {
-        Self::Serialize(error)
+        if error.is_io() {
+            let kind = error.io_error_kind().unwrap_or(io::ErrorKind::Other);
+            Self::Io(io::Error::new(kind, error))
+        } else {
+            Self::Serialize(error)
+        }
     }
 }
 
