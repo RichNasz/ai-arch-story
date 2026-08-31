@@ -10,6 +10,12 @@ permissions:
   packages: write
 
 jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-repository-hygiene.sh
+
   rust:
     runs-on: ubuntu-latest
     steps:

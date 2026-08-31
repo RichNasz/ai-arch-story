@@ -36,12 +36,17 @@ A GitHub Actions workflow runs on pull requests and pushes to `main`. It must:
 2. install the web editor dependencies deterministically and run its build and
    test suite; and
 3. build the `Containerfile` as a container-image verification step.
+4. run repository-hygiene verification before other jobs.
 
 On successful pushes to `main`, the workflow publishes the development image
 `ghcr.io/richnasz/ai-arch-story:main`. It uses GitHub's ephemeral token with
 only `contents: read` and `packages: write` permissions. Pull-request runs
 verify builds but never publish an image, create a GitHub Release, or add
 registry/download/release badges.
+
+Repository hygiene fails if tracked paths include `.superpowers/`, `.worktrees/`,
+`.DS_Store`, or generated `output/` content. It also runs `git diff --check`
+against the triggering commit.
 
 ## Deferred Container Publication
 

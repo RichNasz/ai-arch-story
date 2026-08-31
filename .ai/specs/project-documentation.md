@@ -266,6 +266,7 @@ must not be masked by broken README links or unsupported claims.
 | Branding guide | `docs/branding.md` | Diagram authors; workspace branding, overrides, assets, and visual precedence | Link from the README documentation navigation |
 | Container usage reference | `docs/container-usage.md` | Users and operators; project-supported Podman and container-started command parameters | Link from the Podman quick start and documentation navigation |
 | User guides | `docs/` | Users who need topic-focused workflows beyond quick start | Link from the README documentation section when it aids discovery |
+| Development workflow | `docs/development-workflow.md` | Contributors and agents; branch, verification, and publish gates | Link from the README documentation section |
 
 When introducing any future document:
 

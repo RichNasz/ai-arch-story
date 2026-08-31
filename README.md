@@ -162,6 +162,8 @@ components work together. The [branding guide](docs/branding.md) explains how
 to apply organization identity to a workspace or individual diagram. The
 [container usage reference](docs/container-usage.md) documents
 project-supported Podman and container-started command parameters.
+[development workflow](docs/development-workflow.md) defines contributor and
+agent verification gates.
 
 Contribution, community, security, release, and license documents will be
 linked here when they are published. Until then, this README and the specs are

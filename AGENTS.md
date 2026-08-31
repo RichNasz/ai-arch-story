@@ -13,6 +13,15 @@ A system for creating visually stunning, self-contained HTML technical architect
 3. If a decision isn't covered by an existing spec, write or update a spec before writing code or documentation
 4. Code and documentation follow specs. If either disagrees with a spec, the spec wins — update the artifact or propose a spec change
 
+### Execution Guardrails
+
+- Keep one implementation objective active at a time. Explicitly report a pause before changing topics.
+- Do not claim work has started until a command is running or an assigned task is active.
+- Before every commit, merge, or push, inspect `git status --short`, the staged path list, and `git diff --check`.
+- Never commit local agent artifacts (`.superpowers/`, `.worktrees/`), generated output, platform metadata, or secrets.
+- Use a single owner for sequential changes. Delegate only independent, bounded work and re-check the working tree after every delegated task.
+- Before a public merge or publish, report the branch, commits, changed paths, verification evidence, CI state, and every remaining external action.
+
 ### Spec Authority
 
 - `.ai/specs/README.md` — Index, status, and dependency graph for all specs
