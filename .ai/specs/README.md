@@ -30,6 +30,7 @@ This directory contains the source-of-truth specifications for the AI Arch Story
 | [container-modes.md](container-modes.md) | **Done** | Render vs. serve container modes, Containerfile structure | tech-stack, web-api |
 | [open-source-distribution.md](open-source-distribution.md) | **Draft** | Apache-2.0 licensing, GitHub repository baseline, and pre-release CI boundary | project-documentation, container-modes |
 | [public-release-remediation.md](public-release-remediation.md) | **Draft** | Security, provenance, build-context, and API-contract remediation for the public repository | web-api, workspace-structure, export-format, container-modes, open-source-distribution |
+| [workspace-bootstrap.md](workspace-bootstrap.md) | **Draft** | `start` initialization and `serve` workspace validation contract | workspace-structure, container-modes, agent-skill |
 | [custom-types.md](custom-types.md) | **Done** | User-definable node types, SVG shape imports, type libraries, inheritance | diagram-schema, workspace-structure, web-api, web-editor, visual-design |
 
 ## Status Definitions
