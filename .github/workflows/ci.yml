@@ -46,5 +46,6 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Containerfile
           push: ${{ github.event_name == 'push' }}
           tags: ghcr.io/richnasz/ai-arch-story:main
