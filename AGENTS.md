@@ -37,7 +37,10 @@ A system for creating visually stunning, self-contained HTML technical architect
 - `.ai/specs/agent-skill.md` — Agent generation rules, conversational patterns, type inference
 - `.ai/specs/web-api.md` — HTTP API endpoints, request/response shapes, validation-on-write
 - `.ai/specs/web-editor.md` — React + PatternFly form-based editor UI with live SVG preview
-- `.ai/specs/container-modes.md` — Render vs. serve container modes, Containerfile structure
+- `.ai/specs/container-modes.md` — Render, start, and serve container commands; Containerfile structure
+- `.ai/specs/workspace-bootstrap.md` — Safe workspace initialization, repair, and serve validation
+- `.ai/specs/open-source-distribution.md` — Apache-2.0 distribution, CI, and development-image policy
+- `.ai/specs/public-release-remediation.md` — Public-release security and provenance remediation
 - `.ai/specs/custom-types.md` — User-definable node types, SVG shape imports, type libraries, inheritance
 
 ## Tech Stack

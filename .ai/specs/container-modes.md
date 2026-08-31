@@ -2,11 +2,16 @@
 
 ## What
 
-The `ai-arch-story` container supports two operating modes via CLI subcommands: **render** (batch, one-shot) and **serve** (long-running HTTP server with web editor).
+The `ai-arch-story` container provides three CLI commands: **render** (batch,
+one-shot), **start** (one-time workspace initialization or repair), and
+**serve** (long-running HTTP server with web editor).
 
 ## Why
 
-The container already bundles the Rust binary and Graphviz for rendering. Extending it with a `serve` mode adds the web editor and API with zero additional installs for the user. Both modes share the same binary, validation logic, and rendering pipeline.
+The container bundles the Rust binary and Graphviz for rendering. `start`
+provides a deliberate bootstrap boundary before `serve` exposes the editor and
+API. All commands share the same binary, validation logic, and rendering
+pipeline.
 
 ## Subcommands
 
@@ -48,17 +53,31 @@ podman run --rm \
   ai-arch-story render diagrams/overview/diagram.json
 ```
 
-### `serve` (new)
+### `start`
+
+Initializes or safely repairs a project workspace, then exits.
+
+```
+ai-arch-story start [--workspace <path>] [--name <name>] [--yes]
+```
+
+`start` defaults the workspace to the current directory and the project name
+to that directory's title-cased basename. Unless `--yes` is passed, it displays
+both values and lets the user confirm, edit either value, or quit before it
+changes files. Its safety and repair behavior is defined by
+`workspace-bootstrap.md`.
+
+### `serve`
 
 Starts an HTTP server that serves the web editor UI and API.
 
 ```
-ai-arch-story serve [--workspace <path>] [--port <port>] [--host <host>]
+ai-arch-story serve [--workspace <path>] [--port <port>] [--host <host>] [--static-dir <path>]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--workspace` | `/workspace` | Project or diagram root directory |
+| `--workspace` | `.` | Initialized project workspace. The container's `WORKDIR /workspace` makes `/workspace` the effective default in a normal container run. |
 | `--port` | `8080` | HTTP port |
 | `--host` | `0.0.0.0` | Bind address |
 | `--static-dir` | (compiled-in) | Override path to webapp static files (dev only) |

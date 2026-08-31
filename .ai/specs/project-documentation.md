@@ -60,26 +60,36 @@ without promising unimplemented features:
 
 ### 3. Quick Start: Podman
 
-Provide the shortest supported path for a user to render a diagram and the
-separate command to run the editor. State Podman and an available project or
-diagram workspace as prerequisites. Commands must follow `container-modes.md`:
+Provide the shortest supported interactive path for a user who has created a
+new directory: start the pre-built development image, confirm the workspace
+and project name, then run the editor. State Podman and a user-chosen directory
+as prerequisites. Commands must follow `container-modes.md`:
 
 ```bash
-podman run --rm -v ./my-project:/workspace:Z ai-arch-story render diagrams/overview/diagram.json
+podman run --rm -it -v "$(pwd):/workspace:Z" ghcr.io/richnasz/ai-arch-story:main \
+  start --workspace /workspace --name "$(basename "$PWD")"
 
-podman run --rm -v ./my-project:/workspace:Z -p 8080:8080 ai-arch-story serve
+podman run --rm -v "$(pwd):/workspace:Z" -p 8080:8080 \
+  ghcr.io/richnasz/ai-arch-story:main serve
 ```
 
-Before the commands, state the mode-selection rule: use `render` for a
-one-shot conversion of an existing, finished `diagram.json`; use `serve` for
-interactive creation or editing. Explain that `serve` keeps the HTTP API and
-web editor running and that a coding agent and the browser editor can use that
-same running service and mounted workspace concurrently. The browser editor is
-available at `http://localhost:8080`.
+Explain that the `main` image is public but mutable and intended for active
+development, not a release guarantee. `start` must be presented before
+interactive `serve`; it initializes or repairs the workspace and then exits.
+Because the standard container mount makes the in-container path `/workspace`,
+the quick-start command passes the host directory basename as the initial
+project name; the interactive prompt lets the user change it. State the
+mode-selection rule: use `render` for a one-shot conversion of an existing,
+finished `diagram.json`; use `serve` for interactive creation or editing.
+Explain that `serve` keeps the HTTP API and web editor running and that a
+coding agent and the browser editor can use that same running service and
+mounted workspace concurrently. The browser editor is available at
+`http://localhost:8080`.
 
-Do not claim a published image name, registry location, or version tag until it
-exists; use a clearly identified local image name or link to an
-install/release guide once one is published. Link readers to
+Do not claim a stable release, version tag, `latest` tag, or compatibility
+promise. The public `ghcr.io/richnasz/ai-arch-story:main` development image
+may be documented once anonymous pulling has been verified. Also document the
+local image build route for contributors. Link readers to
 `docs/container-usage.md` immediately after the quick-start examples for the
 complete, project-supported Podman parameter reference and application command
 options.
@@ -189,7 +199,9 @@ The reference must cover:
 
 - The local image build command and its `-t` image-tag parameter and build
   context.
-- The shared `podman run` parameters: `--rm`, `-v` volume mounts, the
+- The public, mutable GHCR development-image pull/use route and the local image
+  build route for contributors.
+- The shared `podman run` parameters: `--rm`, `-it` for interactive `start`, `-v` volume mounts, the
   `/workspace` container destination, the `:Z` SELinux label, and `-p` port
   publishing. Volume-mount documentation must explain the
   `HOST_PATH:CONTAINER_PATH[:OPTIONS]` structure; distinguish the container
@@ -198,6 +210,8 @@ The reference must cover:
 - The `render` command's required input plus `-o` / `--output`, including how
   relative paths are resolved against the mounted workspace and where the
   default output is written.
+- The `start` command's `--workspace`, `--name`, and `--yes` parameters,
+  including its confirmation, cancellation, and safe-repair behavior.
 - The `serve` command's `--workspace`, `--port`, `--host`, and `--static-dir`
   parameters, their defaults, intended use, and host-to-container port mapping.
 - The distinction between the application's `.` workspace default and the
@@ -206,8 +220,8 @@ The reference must cover:
 - The UBI 9 Minimal runtime baseline, its use of `microdnf` for Graphviz, and
   the separate ABI-compatible Rust builder. The reference must clarify that
   build-stage images do not ship in the distribution image.
-- At least one complete render example and one complete editor/API-server
-  example using the local image name.
+- At least one complete bootstrap/editor example using the public development
+  image and one complete local-build render example.
 
 It must state that `--static-dir` is a development-only override and that the
 server has no authentication, so published ports are appropriate only for the
@@ -294,8 +308,8 @@ An implementation of this spec is acceptable only when:
   application parameter used by the supported commands, with examples that
   match the image's runtime behavior.
 - The README and container usage reference clearly distinguish one-shot
-  `render` conversion from the long-running `serve` mode used for the web
-  editor and agent-driven interactive editing.
+  `render`, one-time `start` bootstrap, and long-running `serve` mode used for
+  web-editor and agent-driven interactive editing.
 - The container usage reference explains the three parts of a `-v` value and
   gives actionable selection guidance for `ro`/`rw`, `z`/`Z`, and non-SELinux
   hosts; it warns readers before suggesting ownership or overlay options.

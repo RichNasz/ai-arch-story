@@ -18,7 +18,7 @@ Users never write JSON directly. The agent is the sole producer of diagram defin
 
 ### 1. Workspace Management
 
-- **Initialize projects** — Create `project.json`, `shared/`, and `diagrams/` structure at a user-specified path
+- **Initialize projects** — Guide the user through `ai-arch-story start` at a user-specified path. The command confirms the resolved path and derived project name before safely creating `project.json`, `shared/`, and `diagrams/`.
 - **Discover existing projects** — Detect `project.json` to load project context
 - **Create diagrams** — Create new diagram folders with `diagram.json` under the project
 - **Navigate diagrams** — List and switch between diagrams in a project
@@ -40,7 +40,12 @@ Users never write JSON directly. The agent is the sole producer of diagram defin
 
 ### 4. Build Invocation via HTTP API
 
-When the container is running (`ai-arch-story serve`), the agent uses the HTTP API for all operations. This ensures consistency with the web editor — both paths share the same validation and rendering pipeline.
+For a new project, the agent first directs the user to run
+`ai-arch-story start`; it does not bypass the command's confirmation and repair
+rules by creating workspace files itself. Once `ai-arch-story serve` is
+running against that valid workspace, the agent uses the HTTP API for all
+operations. This ensures consistency with the web editor — both paths share
+the same validation and rendering pipeline.
 
 **API base**: `http://localhost:8080/api/v1` (default port; may vary)
 
@@ -221,3 +226,4 @@ The agent skill should be implementable as a Claude Code skill or similar agent 
 - `web-api.md` — HTTP API endpoints for reading, writing, validating, and rendering
 - `custom-types.md` — Custom type definitions, SVG shape imports, type libraries
 - `container-modes.md` — How to start the container in serve mode
+- `workspace-bootstrap.md` — How a user initializes, confirms, or repairs a workspace before serve mode

@@ -6,7 +6,7 @@ AI Arch Story is a public, Apache License 2.0 open-source project. GitHub at
 `https://github.com/RichNasz/ai-arch-story` is its canonical source repository.
 
 The active-development baseline establishes licensing, discoverability,
-continuous verification, and a development container image.
+continuous verification, and a publicly pullable development container image.
 
 ## Why
 
@@ -48,7 +48,7 @@ Repository hygiene fails if tracked paths include `.superpowers/`, `.worktrees/`
 `.DS_Store`, or generated `output/` content. It also runs `git diff --check`
 against the triggering commit.
 
-## Deferred Container Publication
+## Development Image and Deferred Releases
 
 `main` is a mutable active-development tag, not a release or compatibility
 promise. A separate release specification is still required before adding
@@ -61,9 +61,15 @@ define:
 - image signing, provenance, and vulnerability-response expectations; and
 - supported platforms and compatibility policy.
 
-After that decision, `container-modes.md`, `project-documentation.md`, and the
-container-usage documentation must be updated together with the publishing
-workflow. Until then, user documentation uses a locally built image name only.
+The mutable development image is publicly available as
+`ghcr.io/richnasz/ai-arch-story:main`; users may pull it without cloning the
+repository. Documentation must identify it as an active-development image and
+must not imply stability, support, or release compatibility. Local builds
+remain supported for contributors and for testing changes before publishing.
+
+After a release policy is decided, `container-modes.md`,
+`project-documentation.md`, and the container-usage documentation must be
+updated together with the publishing workflow.
 
 ## Verification
 

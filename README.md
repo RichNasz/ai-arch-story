@@ -23,8 +23,39 @@ includes its styles, SVG, flow animations, and interaction code.
 
 ## Quick Start: Podman
 
-Prerequisites: [Podman](https://podman.io/) and this repository checkout. The
-following commands build a local image and render the included CloudBrew example.
+Prerequisite: [Podman](https://podman.io/). You do not need to clone this
+repository to begin a diagram project. The public `main` image is a mutable
+active-development build, not a release or compatibility promise.
+
+Create and enter a directory for your project, then initialize it. `start`
+shows the resolved workspace and the directory-name-derived project name; you
+can confirm, edit either value, or quit before anything is written:
+
+```bash
+mkdir my-architecture && cd my-architecture
+podman run --rm -it \
+  -v "$(pwd):/workspace:Z" \
+  ghcr.io/richnasz/ai-arch-story:main \
+  start --workspace /workspace --name "$(basename "$PWD")"
+```
+
+`start` creates only `project.json`, `shared/`, and `diagrams/`, then exits.
+It never initializes Git. If the directory is partially initialized, it lists
+exactly what it can repair and asks for approval.
+
+Choose `serve` for ongoing interactive creation or editing. It requires an
+initialized project workspace, then keeps the web editor and HTTP API running;
+both the browser editor and a coding agent use that same API and mounted
+workspace:
+
+```bash
+podman run --rm \
+  -v "$(pwd):/workspace:Z" \
+  -p 8080:8080 \
+  ghcr.io/richnasz/ai-arch-story:main serve
+```
+
+Open [http://localhost:8080](http://localhost:8080) in a browser.
 
 Choose `render` when you already have a `diagram.json` and only need its HTML
 export. The command converts one diagram, writes the file, and exits:
@@ -38,29 +69,6 @@ podman run --rm \
 
 The rendered file is written to
 `test/cloudbrew/diagrams/system-overview/output/system-overview.html`.
-
-Use `start` once to initialize a project workspace before interactive work. It
-creates only `project.json`, `shared/`, and `diagrams/`, then exits:
-
-```bash
-podman run --rm \
-  -v "$(pwd)/my-project:/workspace:Z" \
-  ai-arch-story start --workspace /workspace --yes
-```
-
-Choose `serve` for ongoing interactive creation or editing. It requires that
-initialized project workspace, then keeps the web editor and HTTP API running;
-both the browser editor and a coding agent use that same API and mounted
-workspace:
-
-```bash
-podman run --rm \
-  -v "$(pwd)/test/cloudbrew:/workspace:Z" \
-  -p 8080:8080 \
-  ai-arch-story serve
-```
-
-Open [http://localhost:8080](http://localhost:8080) in a browser.
 
 With `serve` running, open the project in Codex or Claude Code and ask it to
 create or refine a diagram. The agent sends validated changes to the same API;

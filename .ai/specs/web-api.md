@@ -32,7 +32,7 @@ All endpoints return JSON (`Content-Type: application/json`) unless otherwise no
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/project` | Returns `project.json` metadata (or 404 in standalone mode) |
+| GET | `/api/v1/project` | Returns validated `project.json` metadata |
 | GET | `/api/v1/diagrams` | Lists all diagram folders in the workspace |
 
 `GET /diagrams` response:
@@ -130,14 +130,19 @@ The `serve` subcommand accepts:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--workspace` | `/workspace` | Path to the project or standalone diagram directory |
+| `--workspace` | `.` | Path to an initialized project workspace. In the container, `WORKDIR /workspace` makes `/workspace` the effective default. |
 | `--port` | `8080` | HTTP port to bind |
 | `--host` | `0.0.0.0` | Bind address |
 | `--static-dir` | (built-in) | Path to the webapp static files (overridable for development) |
 
 ## Concurrency
 
-The server reads `diagram.json` from disk on every request — no in-memory cache. This ensures that if the file is modified externally (e.g., by a script or manual edit), the API always reflects the current state.
+`serve` validates its workspace before it starts. It requires a valid
+`project.json`, `shared/`, and `diagrams/` directory; on failure it exits and
+prints the exact `start --workspace` repair command. The server then reads
+`diagram.json` from disk on every request — no in-memory cache. This ensures
+that if the file is modified externally (e.g., by a script or manual edit),
+the API always reflects the current state.
 
 Write operations use filesystem-level atomicity: write to a temp file, then rename. This prevents partial writes from corrupting `diagram.json`.
 

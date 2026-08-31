@@ -10,7 +10,7 @@ workspace; it never initializes or repairs one.
 
 ```text
 ai-arch-story start [--workspace <path>] [--name <name>] [--yes]
-ai-arch-story serve [--workspace <path>] [--port <port>] [--host <host>]
+ai-arch-story serve [--workspace <path>] [--port <port>] [--host <host>] [--static-dir <path>]
 ```
 
 `start` defaults `--workspace` to the current directory. Its default project

@@ -15,7 +15,7 @@ This directory contains the source-of-truth specifications for the AI Arch Story
 |------|--------|---------|-------------|
 | [project-vision.md](project-vision.md) | **Done** | Overall vision, design principles, interaction model, open questions | None |
 | [tech-stack.md](tech-stack.md) | **Done** | Technology choices (Rust toolchain, JS/CSS in HTML, hybrid layout) | project-vision |
-| [project-documentation.md](project-documentation.md) | **Done** | Root README requirements, truthful badges, and future-documentation map | project-vision, tech-stack, container-modes, agent-skill |
+| [project-documentation.md](project-documentation.md) | **Draft** | Root README requirements, truthful badges, and future-documentation map | project-vision, tech-stack, container-modes, workspace-bootstrap, agent-skill, open-source-distribution |
 | [diagram-schema.md](diagram-schema.md) | **Done** | JSON definition format — the contract between agent and renderer | project-vision, tech-stack |
 | [workspace-structure.md](workspace-structure.md) | **Done** | Folder hierarchy for projects (thematic collections) and diagrams | project-vision, diagram-schema |
 | [test-plan.md](test-plan.md) | **Done** | Validation plan using "CloudBrew" thematic test project (5 diagrams) | workspace-structure, diagram-schema |
@@ -25,9 +25,9 @@ This directory contains the source-of-truth specifications for the AI Arch Story
 | [export-format.md](export-format.md) | **Done** | Self-contained HTML assembly, asset inlining, structure | tech-stack, rendering-engine |
 | [agent-skill.md](agent-skill.md) | **Done** | How the AI agent generates and iterates on diagram definitions | diagram-schema |
 | [branding.md](branding.md) | **Done** | Logo, organization name, footer, favicon, brand colors | visual-design, workspace-structure, export-format |
-| [web-api.md](web-api.md) | **Done** | HTTP API endpoints, request/response shapes, validation-on-write | diagram-schema, workspace-structure, tech-stack |
+| [web-api.md](web-api.md) | **Draft** | HTTP API endpoints, request/response shapes, validation-on-write | diagram-schema, workspace-structure, workspace-bootstrap, tech-stack |
 | [web-editor.md](web-editor.md) | **Done** | React + PatternFly form-based editor UI with live SVG preview | web-api, rendering-engine, visual-design |
-| [container-modes.md](container-modes.md) | **Done** | Render vs. serve container modes, Containerfile structure | tech-stack, web-api |
+| [container-modes.md](container-modes.md) | **Draft** | Render, start, and serve container commands; Containerfile structure | tech-stack, web-api, workspace-bootstrap |
 | [open-source-distribution.md](open-source-distribution.md) | **Draft** | Apache-2.0 licensing, GitHub repository baseline, and pre-release CI boundary | project-documentation, container-modes |
 | [public-release-remediation.md](public-release-remediation.md) | **Draft** | Security, provenance, build-context, and API-contract remediation for the public repository | web-api, workspace-structure, export-format, container-modes, open-source-distribution |
 | [workspace-bootstrap.md](workspace-bootstrap.md) | **Draft** | `start` initialization and `serve` workspace validation contract | workspace-structure, container-modes, agent-skill |
