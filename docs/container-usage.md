@@ -37,13 +37,16 @@ for the ABI compatibility contract.
 | Goal | Run | What happens |
 | --- | --- | --- |
 | Convert an existing, finished diagram definition into one HTML file | `render` | Runs once, writes the HTML export, and exits. It does not start the web editor or API. |
-| Create or edit diagrams through the browser, a coding agent, or both | `serve` | Keeps the web editor and HTTP API running against the mounted workspace. |
+| Initialize a new project workspace | `start` | Runs once, safely creates the required project metadata and directories, then exits. |
+| Create or edit diagrams through the browser, a coding agent, or both | `serve` | Keeps the web editor and HTTP API running against an initialized project workspace. |
 
 Use `render` for a single HTML conversion. Use `serve` for an interactive
 session: the browser editor and a coding agent both use the same HTTP API and
 the same mounted workspace. Start one `serve` container, open the editor in a
 browser, and point the agent at that API; a second container is not needed for
-the agent.
+the agent. `render` also supports a standalone `diagram.json`; it does not
+require project initialization. Use `start` once before the first interactive
+`serve` session for a new project.
 
 ## Shared `podman run` Parameters
 
@@ -158,7 +161,25 @@ podman run --rm \
 
 ## Start the Web Editor and API: Interactive Editing
 
-Use `serve` to start the local HTTP API and the web editor it serves:
+Initialize a new project once before using `serve`:
+
+```text
+ai-arch-story start [--workspace <path>] [--name <name>] [--yes]
+```
+
+For example, create an initialized project in an empty host directory:
+
+```bash
+podman run --rm \
+  -v /my/project:/workspace:Z \
+  ai-arch-story start --workspace /workspace --yes
+```
+
+`start` creates only `project.json`, `shared/`, and `diagrams/`; it does not
+create a diagram or start a server. It is safe to run again to repair missing
+standard directories, but it refuses to overwrite invalid `project.json`.
+
+Use `serve` for ongoing interactive editing after the workspace is initialized:
 
 ```text
 ai-arch-story serve [--workspace <path>] [--port <port>] [--host <host>] [--static-dir <path>]
@@ -166,7 +187,7 @@ ai-arch-story serve [--workspace <path>] [--port <port>] [--host <host>] [--stat
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `--workspace <path>` | `.` | Workspace containing the project or diagram files. The binary defaults to the current directory. Because the image sets `WORKDIR /workspace`, its effective default is `/workspace` when run in the container. |
+| `--workspace <path>` | `.` | Initialized project workspace containing `project.json`, `shared/`, and `diagrams/`. The binary defaults to the current directory. Because the image sets `WORKDIR /workspace`, its effective default is `/workspace` when run in the container. If validation fails, `serve` exits before binding and prints the exact `start --workspace` repair command. |
 | `--port <port>` | `8080` | Port on which the application listens inside the container. Pair it with a matching `-p` mapping to reach it from the host. |
 | `--host <host>` | `0.0.0.0` | Address on which the application listens. The default accepts connections available through the Podman port mapping. |
 | `--static-dir <path>` | Built-in editor assets | Development-only override for the location of the web-editor static files. Do not use it for normal container operation. |

@@ -12,6 +12,7 @@ use tower_http::cors::CorsLayer;
 use state::AppState;
 
 pub async fn run_server(workspace: PathBuf, host: &str, port: u16, static_dir: Option<PathBuf>) -> Result<()> {
+    println!("Workspace: {}", workspace.display());
     let state = AppState::new(workspace);
 
     let api_routes = routes::api_router();
@@ -34,8 +35,6 @@ pub async fn run_server(workspace: PathBuf, host: &str, port: u16, static_dir: O
 
     let addr = format!("{}:{}", host, port);
     println!("Serving on http://{}", addr);
-    println!("Workspace: {}", std::env::current_dir().unwrap_or_default().display());
-
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
 

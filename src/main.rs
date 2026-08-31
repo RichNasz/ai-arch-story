@@ -78,6 +78,7 @@ fn main() -> Result<()> {
         }
         Commands::Render { input, output } => cmd_render(&input, output.as_deref()),
         Commands::Serve { workspace, port, host, static_dir } => {
+            let workspace = bootstrap::validate_serve_workspace(&workspace).map_err(|error| anyhow!(error))?;
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(server::run_server(workspace, &host, port, static_dir))
         }

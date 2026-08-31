@@ -22,6 +22,12 @@ coding agent uses that same API, so the agent and web editor work against the
 same mounted workspace through one running container. Do not start a separate
 container for the agent; point it at the API exposed by the `serve` container.
 
+Use `start` once before the first interactive session for a new project. It
+initializes the project workspace and exits. `serve` is for ongoing development
+and accepts only an initialized project workspace; it never creates or repairs
+workspace content. `render` remains a standalone one-shot operation and may
+render an individual `diagram.json` without project initialization.
+
 ### `render` (existing behavior)
 
 One-shot rendering of a single diagram to HTML.
@@ -66,6 +72,12 @@ podman run --rm \
 ```
 
 The user opens `http://localhost:8080` in their browser to access the web editor.
+
+Before creating the Tokio runtime or binding a listener, `serve` validates the
+workspace as defined in `workspace-bootstrap.md`. On failure it exits non-zero,
+lists every missing or invalid standard item, and prints the exact
+`ai-arch-story start --workspace <resolved-path>` repair command. It never
+creates directories or files.
 
 ## Containerfile Structure
 

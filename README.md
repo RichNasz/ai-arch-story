@@ -39,9 +39,19 @@ podman run --rm \
 The rendered file is written to
 `test/cloudbrew/diagrams/system-overview/output/system-overview.html`.
 
-Choose `serve` when you want to create or edit diagrams interactively. It keeps
-the web editor and HTTP API running, and both the browser editor and a coding
-agent use that same API and mounted workspace. Start it once for the workspace:
+Use `start` once to initialize a project workspace before interactive work. It
+creates only `project.json`, `shared/`, and `diagrams/`, then exits:
+
+```bash
+podman run --rm \
+  -v "$(pwd)/my-project:/workspace:Z" \
+  ai-arch-story start --workspace /workspace --yes
+```
+
+Choose `serve` for ongoing interactive creation or editing. It requires that
+initialized project workspace, then keeps the web editor and HTTP API running;
+both the browser editor and a coding agent use that same API and mounted
+workspace:
 
 ```bash
 podman run --rm \
@@ -101,8 +111,9 @@ Vite proxies `/api` requests to the server at port 8080.
 to describe an architecture conversationally, make validated diagram changes
 through the local HTTP API, and render the final HTML.
 
-Start the service with `ai-arch-story serve`, then open the repository in your
-preferred coding agent and describe the diagram you want to create or refine.
+Initialize a new project once with `ai-arch-story start --yes`, then start the
+service with `ai-arch-story serve`. Open the repository in your preferred
+coding agent and describe the diagram you want to create or refine.
 The project instructions in [AGENTS.md](AGENTS.md) and
 [CLAUDE.md](CLAUDE.md) direct the agent to the source-of-truth specs and the
 shared API workflow. See the [agent workflow spec](.ai/specs/agent-skill.md)

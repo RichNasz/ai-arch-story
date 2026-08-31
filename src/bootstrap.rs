@@ -41,8 +41,13 @@ pub(crate) enum WorkspaceItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum WorkspaceStatus {
     Valid,
-    Repairable { missing: Vec<WorkspaceItem> },
-    InvalidProjectMetadata { error: String },
+    Repairable {
+        missing: Vec<WorkspaceItem>,
+    },
+    InvalidProjectMetadata {
+        error: String,
+        missing: Vec<WorkspaceItem>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +74,7 @@ pub(crate) fn run_start<R: BufRead, W: Write>(
         writeln!(output, "Project name: {name}").map_err(|error| error.to_string())?;
 
         match inspect_workspace(&workspace) {
-            WorkspaceStatus::InvalidProjectMetadata { error } => {
+            WorkspaceStatus::InvalidProjectMetadata { error, .. } => {
                 writeln!(output, "Cannot initialize workspace: {error}")
                     .map_err(|write_error| write_error.to_string())?;
                 return Err(error);
@@ -228,18 +233,19 @@ fn serve_guidance(workspace: &Path) -> String {
 
 pub(crate) fn inspect_workspace(workspace: &Path) -> WorkspaceStatus {
     let project_json = workspace.join("project.json");
-    if project_json.exists() {
+    let metadata_error = if project_json.exists() {
         let metadata = match fs::read_to_string(&project_json) {
             Ok(contents) => serde_json::from_str::<ProjectMetadata>(&contents)
                 .map_err(|error| format!("project.json is not valid JSON: {error}")),
             Err(error) => Err(format!("could not read project.json: {error}")),
         };
 
-        match metadata.and_then(|metadata| metadata.validate().map(|()| metadata)) {
-            Ok(_) => {}
-            Err(error) => return WorkspaceStatus::InvalidProjectMetadata { error },
-        }
-    }
+        metadata
+            .and_then(|metadata| metadata.validate().map(|()| metadata))
+            .err()
+    } else {
+        None
+    };
 
     let mut missing = Vec::new();
     if !project_json.exists() {
@@ -252,11 +258,43 @@ pub(crate) fn inspect_workspace(workspace: &Path) -> WorkspaceStatus {
         missing.push(WorkspaceItem::DiagramsDirectory);
     }
 
-    if missing.is_empty() {
+    if let Some(error) = metadata_error {
+        WorkspaceStatus::InvalidProjectMetadata { error, missing }
+    } else if missing.is_empty() {
         WorkspaceStatus::Valid
     } else {
         WorkspaceStatus::Repairable { missing }
     }
+}
+
+pub(crate) fn validate_serve_workspace(workspace: &Path) -> Result<PathBuf, String> {
+    let workspace = resolve_workspace(workspace)?;
+    let issues = match inspect_workspace(&workspace) {
+        WorkspaceStatus::Valid => return Ok(workspace),
+        WorkspaceStatus::Repairable { missing } => missing
+            .into_iter()
+            .map(|item| workspace_item_label(item).to_string())
+            .collect(),
+        WorkspaceStatus::InvalidProjectMetadata { error, missing } => {
+            let mut issues = vec![format!("project.json: {error}")];
+            issues.extend(
+                missing
+                    .into_iter()
+                    .map(|item| workspace_item_label(item).to_string()),
+            );
+            issues
+        }
+    };
+
+    Err(format!(
+        "Cannot start server: workspace is not valid:\n{}\nRepair: ai-arch-story start --workspace {}",
+        issues
+            .iter()
+            .map(|issue| format!("- {issue}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        workspace.display()
+    ))
 }
 
 pub(crate) fn default_project_name(workspace: &Path) -> String {
@@ -301,7 +339,7 @@ mod tests {
 
     use super::{
         ProjectMetadata, WorkspaceItem, WorkspaceStatus, default_project_name, inspect_workspace,
-        run_start,
+        run_start, validate_serve_workspace,
     };
 
     static NEXT_WORKSPACE: AtomicUsize = AtomicUsize::new(0);
@@ -419,6 +457,40 @@ mod tests {
             inspect_workspace(&workspace.root),
             WorkspaceStatus::InvalidProjectMetadata { .. }
         ));
+    }
+
+    #[test]
+    fn serve_validation_lists_invalid_metadata_and_all_missing_directories_with_repair_command() {
+        // Returning after the metadata error would hide missing directories and permit an unclear repair.
+        let workspace = TestWorkspace::new("serve-invalid-workspace");
+        fs::write(workspace.root.join("project.json"), "{ not json }")
+            .expect("write malformed project metadata");
+
+        let error =
+            validate_serve_workspace(&workspace.root).expect_err("reject invalid workspace");
+        let resolved = workspace.root.canonicalize().expect("resolve workspace");
+
+        assert!(error.contains("- project.json: project.json is not valid JSON:"));
+        assert!(error.contains("- shared/"));
+        assert!(error.contains("- diagrams/"));
+        assert!(error.contains(&format!(
+            "ai-arch-story start --workspace {}",
+            resolved.display()
+        )));
+    }
+
+    #[test]
+    fn serve_validation_accepts_an_initialized_workspace() {
+        // Rejecting a workspace after bootstrap would make the documented start-to-serve path unusable.
+        let workspace = TestWorkspace::new("serve-valid-workspace");
+        write_project(&workspace.root, "Serve Valid Workspace");
+        fs::create_dir_all(workspace.root.join("shared")).expect("create shared directory");
+        fs::create_dir_all(workspace.root.join("diagrams")).expect("create diagrams directory");
+
+        assert_eq!(
+            validate_serve_workspace(&workspace.root).expect("accept initialized workspace"),
+            workspace.root.canonicalize().expect("resolve workspace")
+        );
     }
 
     #[test]
