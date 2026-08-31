@@ -10,7 +10,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::schema::{self, CustomTypes, Diagram, Node, Edge, Flow, Group};
-use super::state::AppState;
+use super::state::{AppState, AtomicJsonWriteError, DiagramPaths, atomic_write_json};
 
 #[derive(Serialize)]
 struct ErrorResponse {
@@ -32,8 +32,39 @@ fn error_response(status: StatusCode, code: &str, message: String) -> (StatusCod
     }))
 }
 
+fn diagram_paths(
+    state: &AppState,
+    name: &str,
+) -> Result<DiagramPaths, (StatusCode, Json<ErrorResponse>)> {
+    state.diagram_paths(name).map_err(|_| {
+        error_response(
+            StatusCode::BAD_REQUEST,
+            "INVALID_DIAGRAM_NAME",
+            format!("Invalid diagram name '{}'", name),
+        )
+    })
+}
+
+fn write_json<T: Serialize + ?Sized>(
+    path: &std::path::Path,
+    value: &T,
+) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    atomic_write_json(path, value).map_err(|error| match error {
+        AtomicJsonWriteError::Serialize(error) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "SERIALIZE_ERROR",
+            format!("Failed to serialize: {error}"),
+        ),
+        AtomicJsonWriteError::Io(error) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "IO_ERROR",
+            format!("Failed to write: {error}"),
+        ),
+    })
+}
+
 fn read_diagram(state: &AppState, name: &str) -> Result<Diagram, (StatusCode, Json<ErrorResponse>)> {
-    let path = state.diagram_path(name);
+    let path = diagram_paths(state, name)?.definition();
     let content = fs::read_to_string(&path).map_err(|_| {
         error_response(StatusCode::NOT_FOUND, "NOT_FOUND", format!("Diagram '{}' not found", name))
     })?;
@@ -43,18 +74,13 @@ fn read_diagram(state: &AppState, name: &str) -> Result<Diagram, (StatusCode, Js
 }
 
 fn write_diagram(state: &AppState, name: &str, diagram: &Diagram) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
-    let path = state.diagram_path(name);
+    let path = diagram_paths(state, name)?.definition();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| {
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("Failed to create directory: {}", e))
         })?;
     }
-    let json = serde_json::to_string_pretty(diagram).map_err(|e| {
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "SERIALIZE_ERROR", format!("Failed to serialize: {}", e))
-    })?;
-    fs::write(&path, json).map_err(|e| {
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("Failed to write: {}", e))
-    })
+    write_json(&path, diagram)
 }
 
 fn validate(diagram: &Diagram) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
@@ -113,8 +139,7 @@ async fn put_shared_branding(
     }
     let dir = state.workspace_root.join("shared");
     fs::create_dir_all(&dir).map_err(|e| error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e)))?;
-    let json = serde_json::to_string_pretty(&value).map_err(|e| error_response(StatusCode::INTERNAL_SERVER_ERROR, "SERIALIZE_ERROR", format!("{}", e)))?;
-    fs::write(dir.join("branding.json"), json).map_err(|e| error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e)))?;
+    write_json(&dir.join("branding.json"), &value)?;
     Ok(Json(value))
 }
 
@@ -161,7 +186,7 @@ async fn get_diagram_resolved_types(
     Path(name): Path<String>,
 ) -> Result<Json<crate::schema::ResolvedTypeRegistry>, (StatusCode, Json<ErrorResponse>)> {
     let diagram = read_diagram(&state, &name)?;
-    let input_path = state.diagram_path(&name);
+    let input_path = diagram_paths(&state, &name)?.definition();
     let registry = crate::workspace::resolve_types(&input_path, &diagram).map_err(|e| {
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "TYPE_ERROR", format!("{}", e))
     })?;
@@ -190,12 +215,7 @@ async fn put_project_types(
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e))
     })?;
     let path = dir.join("types.json");
-    let json = serde_json::to_string_pretty(&types).map_err(|e| {
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "SERIALIZE_ERROR", format!("{}", e))
-    })?;
-    fs::write(&path, json).map_err(|e| {
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e))
-    })?;
+    write_json(&path, &types)?;
     Ok(Json(types))
 }
 
@@ -360,6 +380,7 @@ async fn put_diagram(
     Path(name): Path<String>,
     Json(diagram): Json<Diagram>,
 ) -> Result<Json<Diagram>, (StatusCode, Json<ErrorResponse>)> {
+    diagram_paths(&state, &name)?;
     validate(&diagram)?;
     write_diagram(&state, &name, &diagram)?;
     Ok(Json(diagram))
@@ -375,7 +396,7 @@ async fn create_diagram(
     State(state): State<AppState>,
     Json(req): Json<CreateDiagramRequest>,
 ) -> Result<(StatusCode, Json<Diagram>), (StatusCode, Json<ErrorResponse>)> {
-    let path = state.diagram_path(&req.name);
+    let path = diagram_paths(&state, &req.name)?.definition();
     if path.exists() {
         return Err(error_response(StatusCode::CONFLICT, "ALREADY_EXISTS", format!("Diagram '{}' already exists", req.name)));
     }
@@ -403,11 +424,12 @@ async fn delete_diagram(
     State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
-    let dir = state.diagrams_dir().join(&name);
+    let paths = diagram_paths(&state, &name)?;
+    let dir = paths.directory();
     if !dir.exists() {
         return Err(error_response(StatusCode::NOT_FOUND, "NOT_FOUND", format!("Diagram '{}' not found", name)));
     }
-    fs::remove_dir_all(&dir).map_err(|e| {
+    fs::remove_dir_all(dir).map_err(|e| {
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e))
     })?;
     Ok(StatusCode::NO_CONTENT)
@@ -442,22 +464,23 @@ async fn render_diagram(
     let diagram = read_diagram(&state, &name)?;
     validate(&diagram)?;
 
-    let input_path = state.diagram_path(&name);
+    let paths = diagram_paths(&state, &name)?;
+    let input_path = paths.definition();
     let (html, _) = crate::workspace::render_pipeline(&input_path, &diagram).map_err(|e| {
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "RENDER_ERROR", format!("{}", e))
     })?;
 
-    let output_dir = state.diagrams_dir().join(&name).join("output");
+    let output_dir = paths.output_directory();
     fs::create_dir_all(&output_dir).map_err(|e| {
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e))
     })?;
 
-    let output_path = output_dir.join(format!("{}.html", name));
+    let output_path = paths.output();
     fs::write(&output_path, html).map_err(|e| {
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "IO_ERROR", format!("{}", e))
     })?;
 
-    let relative = format!("diagrams/{}/output/{}.html", name, name);
+    let relative = format!("diagrams/{0}/output/{0}.html", paths.name());
     Ok(Json(RenderResponse { output_path: relative }))
 }
 
@@ -468,7 +491,7 @@ async fn get_render_data(
     let diagram = read_diagram(&state, &name)?;
     validate(&diagram)?;
 
-    let input_path = state.diagram_path(&name);
+    let input_path = diagram_paths(&state, &name)?.definition();
     let branding = crate::workspace::resolve_branding(&input_path, &diagram).map_err(|e| {
         error_response(StatusCode::INTERNAL_SERVER_ERROR, "BRANDING_ERROR", format!("{}", e))
     })?;
@@ -496,7 +519,7 @@ async fn get_preview(
     State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<axum::response::Html<String>, (StatusCode, Json<ErrorResponse>)> {
-    let output_path = state.diagrams_dir().join(&name).join("output").join(format!("{}.html", name));
+    let output_path = diagram_paths(&state, &name)?.output();
     let content = fs::read_to_string(&output_path).map_err(|_| {
         error_response(StatusCode::NOT_FOUND, "NOT_FOUND", "No rendered output found. Call POST /render first.".to_string())
     })?;

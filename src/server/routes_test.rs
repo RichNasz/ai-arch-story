@@ -11,7 +11,10 @@ use axum::{
 };
 use tower::ServiceExt;
 
-use super::{routes::api_router, state::AppState};
+use super::{
+    routes::api_router,
+    state::{AppState, atomic_write_json},
+};
 
 static NEXT_WORKSPACE: AtomicUsize = AtomicUsize::new(0);
 
@@ -117,6 +120,11 @@ async fn diagram_routes_reject_unsafe_slugs_without_creating_files() {
         ".",
         "..",
         "System-Overview",
+        "-leading",
+        "trailing-",
+        "two--hyphens",
+        "snake_case",
+        "naïve",
     ];
 
     for name in invalid_names {
@@ -138,8 +146,33 @@ async fn diagram_routes_reject_unsafe_slugs_without_creating_files() {
         .await;
         assert_invalid_name(
             &workspace,
+            "PUT",
+            format!("/diagrams/{encoded_name}"),
+            Body::from(
+                serde_json::json!({
+                    "version": "1.0",
+                    "title": "Unsafe",
+                    "theme": "default",
+                    "nodes": [],
+                    "edges": [],
+                    "flows": [],
+                    "groups": []
+                })
+                .to_string(),
+            ),
+        )
+        .await;
+        assert_invalid_name(
+            &workspace,
             "POST",
             format!("/diagrams/{encoded_name}/render"),
+            Body::empty(),
+        )
+        .await;
+        assert_invalid_name(
+            &workspace,
+            "GET",
+            format!("/diagrams/{encoded_name}/render-data"),
             Body::empty(),
         )
         .await;
@@ -158,6 +191,90 @@ async fn diagram_routes_reject_unsafe_slugs_without_creating_files() {
         )
         .await;
     }
+}
+
+#[tokio::test]
+async fn diagram_routes_reject_percent_decoded_traversal() {
+    // Accepting a percent-decoded dot-dot route segment must make this test fail.
+    let workspace = TestWorkspace::new();
+
+    for (method, suffix) in [
+        ("GET", ""),
+        ("POST", "/render"),
+        ("GET", "/render-data"),
+        ("GET", "/preview"),
+        ("DELETE", ""),
+    ] {
+        assert_invalid_name(
+            &workspace,
+            method,
+            format!("/diagrams/%2e%2e{suffix}"),
+            Body::empty(),
+        )
+        .await;
+    }
+}
+
+#[tokio::test]
+async fn invalid_diagram_name_takes_precedence_over_diagram_validation() {
+    // Validating a body before its unsafe route name must make this test fail.
+    let workspace = TestWorkspace::new();
+    assert_invalid_name(
+        &workspace,
+        "PUT",
+        "/diagrams/..".to_string(),
+        Body::from(
+            serde_json::json!({
+                "version": "1.0",
+                "title": "Invalid",
+                "theme": "default",
+                "nodes": [],
+                "edges": [{
+                    "id": "missing-nodes",
+                    "from": "missing-from",
+                    "to": "missing-to"
+                }],
+                "flows": [],
+                "groups": []
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+}
+
+struct FailingJson;
+
+impl serde::Serialize for FailingJson {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeSeq;
+
+        let mut sequence = serializer.serialize_seq(Some(2))?;
+        sequence.serialize_element("written-before-failure")?;
+        Err(serde::ser::Error::custom("injected serialization failure"))
+    }
+}
+
+#[test]
+fn atomic_json_write_removes_temporary_file_after_serialization_failure() {
+    // Leaving a temporary sibling after a pre-rename failure must make this test fail.
+    let workspace = TestWorkspace::new();
+    let shared = workspace.root.join("shared");
+    fs::create_dir_all(&shared).expect("create shared directory");
+    let destination = shared.join("branding.json");
+
+    assert!(atomic_write_json(&destination, &FailingJson).is_err());
+    assert!(!destination.exists());
+    assert!(
+        fs::read_dir(&shared)
+            .expect("read shared directory")
+            .next()
+            .is_none(),
+        "atomic write failure must remove its temporary sibling"
+    );
 }
 
 #[tokio::test]
