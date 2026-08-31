@@ -9,7 +9,7 @@ mod server;
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -21,6 +21,21 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Initialize or safely repair a project workspace, then exit
+    Start {
+        /// Path to the project workspace directory
+        #[arg(long, default_value = ".")]
+        workspace: PathBuf,
+
+        /// Project display name (defaults to the workspace directory name)
+        #[arg(long)]
+        name: Option<String>,
+
+        /// Skip interactive confirmation
+        #[arg(long)]
+        yes: bool,
+    },
+
     /// Render a diagram.json into a self-contained HTML file
     Render {
         /// Path to diagram.json
@@ -55,6 +70,12 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Start { workspace, name, yes } => {
+            let stdin = std::io::stdin();
+            let stdout = std::io::stdout();
+            bootstrap::run_start(workspace, name, yes, &mut stdin.lock(), &mut stdout.lock())
+                .map_err(|error| anyhow!(error))
+        }
         Commands::Render { input, output } => cmd_render(&input, output.as_deref()),
         Commands::Serve { workspace, port, host, static_dir } => {
             let rt = tokio::runtime::Runtime::new()?;
@@ -100,4 +121,31 @@ fn cmd_render(input: &PathBuf, output: Option<&std::path::Path>) -> Result<()> {
     println!("Generated: {}", output_path.display());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Commands};
+    use clap::Parser;
+    use std::path::PathBuf;
+
+    #[test]
+    fn start_accepts_workspace_name_and_yes_arguments() {
+        // Removing any start flag or parsing it as a different command must fail this test.
+        let cli = Cli::try_parse_from([
+            "ai-arch-story",
+            "start",
+            "--workspace",
+            "demo",
+            "--name",
+            "Demo Project",
+            "--yes",
+        ])
+        .expect("parse start arguments");
+
+        assert!(
+            matches!(cli.command, Commands::Start { workspace, name, yes }
+            if workspace == PathBuf::from("demo") && name.as_deref() == Some("Demo Project") && yes)
+        );
+    }
 }

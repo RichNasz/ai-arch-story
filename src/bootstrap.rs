@@ -1,4 +1,8 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    io::{BufRead, Write},
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +43,187 @@ pub(crate) enum WorkspaceStatus {
     Valid,
     Repairable { missing: Vec<WorkspaceItem> },
     InvalidProjectMetadata { error: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StartChoice {
+    Confirm,
+    EditWorkspace,
+    EditName,
+    Quit,
+}
+
+pub(crate) fn run_start<R: BufRead, W: Write>(
+    workspace: PathBuf,
+    name: Option<String>,
+    yes: bool,
+    input: &mut R,
+    output: &mut W,
+) -> Result<(), String> {
+    let mut workspace = resolve_workspace(&workspace)?;
+    let mut name = name.unwrap_or_else(|| default_project_name(&workspace));
+
+    loop {
+        writeln!(output, "Workspace: {}", workspace.display())
+            .map_err(|error| error.to_string())?;
+        writeln!(output, "Project name: {name}").map_err(|error| error.to_string())?;
+
+        match inspect_workspace(&workspace) {
+            WorkspaceStatus::InvalidProjectMetadata { error } => {
+                writeln!(output, "Cannot initialize workspace: {error}")
+                    .map_err(|write_error| write_error.to_string())?;
+                return Err(error);
+            }
+            WorkspaceStatus::Valid => {
+                writeln!(output, "Workspace is already valid.")
+                    .map_err(|error| error.to_string())?;
+                writeln!(output, "{}", serve_guidance(&workspace))
+                    .map_err(|error| error.to_string())?;
+                return Ok(());
+            }
+            WorkspaceStatus::Repairable { missing } => {
+                if workspace
+                    .read_dir()
+                    .map_err(|error| error.to_string())?
+                    .next()
+                    .is_some()
+                {
+                    writeln!(output, "Existing files will not be changed.")
+                        .map_err(|error| error.to_string())?;
+                }
+                writeln!(output, "Items to add or repair:").map_err(|error| error.to_string())?;
+                for item in missing {
+                    writeln!(output, "- {}", workspace_item_label(item))
+                        .map_err(|error| error.to_string())?;
+                }
+            }
+        }
+
+        if yes {
+            break;
+        }
+
+        let choice = prompt_choice(input, output)?;
+        match choice {
+            StartChoice::Confirm => break,
+            StartChoice::EditWorkspace => {
+                let updated = prompt_value(input, output, "Workspace: ")?;
+                workspace = resolve_workspace(Path::new(&updated))?;
+                if name.trim().is_empty() {
+                    name = default_project_name(&workspace);
+                }
+            }
+            StartChoice::EditName => name = prompt_value(input, output, "Project name: ")?,
+            StartChoice::Quit => {
+                writeln!(output, "Initialization cancelled.").map_err(|error| error.to_string())?;
+                return Ok(());
+            }
+        }
+    }
+
+    if name.trim().is_empty() {
+        return Err("project name must be non-empty".to_string());
+    }
+    initialize_workspace(&workspace, &name)?;
+    writeln!(output, "Workspace initialized.").map_err(|error| error.to_string())?;
+    writeln!(output, "{}", serve_guidance(&workspace)).map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn initialize_workspace(workspace: &Path, name: &str) -> Result<(), String> {
+    let WorkspaceStatus::Repairable { missing } = inspect_workspace(workspace) else {
+        return Ok(());
+    };
+
+    for item in missing {
+        match item {
+            WorkspaceItem::ProjectMetadata => {
+                let file = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(workspace.join("project.json"))
+                    .map_err(|error| format!("could not create project.json: {error}"))?;
+                serde_json::to_writer_pretty(file, &ProjectMetadata::new(name))
+                    .map_err(|error| format!("could not write project.json: {error}"))?;
+            }
+            WorkspaceItem::SharedDirectory => fs::create_dir(workspace.join("shared"))
+                .map_err(|error| format!("could not create shared/: {error}"))?,
+            WorkspaceItem::DiagramsDirectory => fs::create_dir(workspace.join("diagrams"))
+                .map_err(|error| format!("could not create diagrams/: {error}"))?,
+        }
+    }
+    Ok(())
+}
+
+fn prompt_choice<R: BufRead, W: Write>(
+    input: &mut R,
+    output: &mut W,
+) -> Result<StartChoice, String> {
+    loop {
+        write!(
+            output,
+            "Confirm [c], edit workspace [w], edit name [n], or quit [q]: "
+        )
+        .map_err(|error| error.to_string())?;
+        output.flush().map_err(|error| error.to_string())?;
+        let mut answer = String::new();
+        input
+            .read_line(&mut answer)
+            .map_err(|error| error.to_string())?;
+        match answer.trim().to_ascii_lowercase().as_str() {
+            "" | "c" | "confirm" | "y" | "yes" => return Ok(StartChoice::Confirm),
+            "w" | "workspace" => return Ok(StartChoice::EditWorkspace),
+            "n" | "name" => return Ok(StartChoice::EditName),
+            "q" | "quit" => return Ok(StartChoice::Quit),
+            _ => writeln!(output, "Please choose confirm, workspace, name, or quit.")
+                .map_err(|error| error.to_string())?,
+        }
+    }
+}
+
+fn prompt_value<R: BufRead, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    prompt: &str,
+) -> Result<String, String> {
+    write!(output, "{prompt}").map_err(|error| error.to_string())?;
+    output.flush().map_err(|error| error.to_string())?;
+    let mut value = String::new();
+    input
+        .read_line(&mut value)
+        .map_err(|error| error.to_string())?;
+    Ok(value.trim().to_string())
+}
+
+fn resolve_workspace(workspace: &Path) -> Result<PathBuf, String> {
+    let absolute = if workspace.is_absolute() {
+        workspace.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| error.to_string())?
+            .join(workspace)
+    };
+    absolute.canonicalize().map_err(|error| {
+        format!(
+            "could not resolve workspace {}: {error}",
+            absolute.display()
+        )
+    })
+}
+
+fn workspace_item_label(item: WorkspaceItem) -> &'static str {
+    match item {
+        WorkspaceItem::ProjectMetadata => "project.json",
+        WorkspaceItem::SharedDirectory => "shared/",
+        WorkspaceItem::DiagramsDirectory => "diagrams/",
+    }
+}
+
+fn serve_guidance(workspace: &Path) -> String {
+    format!(
+        "Next: ai-arch-story serve --workspace {}",
+        workspace.display()
+    )
 }
 
 pub(crate) fn inspect_workspace(workspace: &Path) -> WorkspaceStatus {
@@ -109,12 +294,14 @@ fn title_case_word(word: &str) -> String {
 mod tests {
     use std::{
         fs,
+        io::Cursor,
         path::{Path, PathBuf},
         sync::atomic::{AtomicUsize, Ordering},
     };
 
     use super::{
         ProjectMetadata, WorkspaceItem, WorkspaceStatus, default_project_name, inspect_workspace,
+        run_start,
     };
 
     static NEXT_WORKSPACE: AtomicUsize = AtomicUsize::new(0);
@@ -232,5 +419,143 @@ mod tests {
             inspect_workspace(&workspace.root),
             WorkspaceStatus::InvalidProjectMetadata { .. }
         ));
+    }
+
+    #[test]
+    fn quitting_interactive_start_leaves_an_empty_workspace_unchanged() {
+        // Removing the quit branch would create workspace files and fail this test.
+        let workspace = TestWorkspace::new("cancelled-workspace");
+        let mut input = Cursor::new(b"q\n");
+        let mut output = Vec::new();
+
+        run_start(workspace.root.clone(), None, false, &mut input, &mut output)
+            .expect("quit is successful");
+
+        assert_eq!(
+            fs::read_dir(&workspace.root)
+                .expect("read workspace")
+                .count(),
+            0
+        );
+        assert!(
+            String::from_utf8(output)
+                .expect("utf8 output")
+                .contains("Initialization cancelled.")
+        );
+    }
+
+    #[test]
+    fn yes_initializes_empty_workspace_and_prints_exact_serve_guidance() {
+        // Omitting any standard workspace item or changing the command must fail this test.
+        let workspace = TestWorkspace::new("payments-api");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        run_start(workspace.root.clone(), None, true, &mut input, &mut output)
+            .expect("initialize workspace");
+
+        assert_eq!(inspect_workspace(&workspace.root), WorkspaceStatus::Valid);
+        assert_eq!(
+            serde_json::from_str::<ProjectMetadata>(
+                &fs::read_to_string(workspace.root.join("project.json")).expect("read project")
+            )
+            .expect("parse project"),
+            ProjectMetadata::new("Payments Api")
+        );
+        assert!(
+            String::from_utf8(output)
+                .expect("utf8 output")
+                .contains(&format!(
+                    "Next: ai-arch-story serve --workspace {}",
+                    workspace
+                        .root
+                        .canonicalize()
+                        .expect("resolve workspace")
+                        .display()
+                ))
+        );
+    }
+
+    #[test]
+    fn yes_repairs_partial_workspace_without_changing_existing_project_or_files() {
+        // Rewriting project.json or unrelated files would make this preservation check fail.
+        let workspace = TestWorkspace::new("partial-preserved");
+        write_project(&workspace.root, "Original Project");
+        fs::create_dir_all(workspace.root.join("shared")).expect("create shared directory");
+        fs::write(workspace.root.join("keep.txt"), "do not change").expect("write user file");
+        let original_project =
+            fs::read_to_string(workspace.root.join("project.json")).expect("read project");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        run_start(
+            workspace.root.clone(),
+            Some("Replacement Name".to_string()),
+            true,
+            &mut input,
+            &mut output,
+        )
+        .expect("repair workspace");
+
+        assert!(workspace.root.join("diagrams").is_dir());
+        assert_eq!(
+            fs::read_to_string(workspace.root.join("project.json")).expect("read project"),
+            original_project
+        );
+        assert_eq!(
+            fs::read_to_string(workspace.root.join("keep.txt")).expect("read user file"),
+            "do not change"
+        );
+        let output = String::from_utf8(output).expect("utf8 output");
+        assert!(output.contains("Existing files will not be changed."));
+        assert!(output.contains("- diagrams/"));
+        assert!(!output.contains("- project.json"));
+        assert!(!output.contains("- shared/"));
+    }
+
+    #[test]
+    fn yes_refuses_invalid_project_json_without_overwriting_it() {
+        // Replacing malformed metadata instead of refusing it would fail this test.
+        let workspace = TestWorkspace::new("invalid-preserved");
+        let invalid = "{ definitely not json }";
+        fs::write(workspace.root.join("project.json"), invalid).expect("write invalid project");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        assert!(run_start(workspace.root.clone(), None, true, &mut input, &mut output).is_err());
+
+        assert_eq!(
+            fs::read_to_string(workspace.root.join("project.json")).expect("read project"),
+            invalid
+        );
+        assert!(!workspace.root.join("shared").exists());
+        assert!(!workspace.root.join("diagrams").exists());
+    }
+
+    #[test]
+    fn interactive_start_allows_editing_workspace_and_name_before_confirmation() {
+        // Ignoring either edit response would initialize the wrong location or metadata name.
+        let initial = TestWorkspace::new("initial-workspace");
+        let selected = TestWorkspace::new("selected-workspace");
+        let mut input = Cursor::new(format!(
+            "w\n{}\nn\nEdited Project\nc\n",
+            selected.root.display()
+        ));
+        let mut output = Vec::new();
+
+        run_start(initial.root.clone(), None, false, &mut input, &mut output)
+            .expect("initialize edited workspace");
+
+        assert_eq!(
+            fs::read_dir(&initial.root).expect("read initial").count(),
+            0
+        );
+        assert_eq!(
+            serde_json::from_str::<ProjectMetadata>(
+                &fs::read_to_string(selected.root.join("project.json")).expect("read project")
+            )
+            .expect("parse project"),
+            ProjectMetadata::new("Edited Project")
+        );
     }
 }
