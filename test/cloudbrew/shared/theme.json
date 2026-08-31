@@ -1,0 +1,28 @@
+{
+  "mode": "light",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F2F2F2",
+    "border": "#E0E0E0",
+    "textPrimary": "#151515",
+    "textSecondary": "#4D4D4D",
+    "groupFill": "#F2F2F2",
+    "groupBorder": "#C7C7C7",
+    "edge": "#A3A3A3",
+    "accent": {
+      "service": "#0066CC",
+      "datastore": "#5E40BE",
+      "queue": "#F5921B",
+      "gateway": "#EE0000",
+      "frontend": "#37A3A3",
+      "external": "#707070",
+      "function": "#876FD4",
+      "user": "#147878",
+      "storage": "#B6A6E9",
+      "generic": "#8C8C8C"
+    }
+  },
+  "typography": {
+    "fontFamily": "\"Red Hat Display\", \"Red Hat Text\", -apple-system, BlinkMacSystemFont, sans-serif"
+  }
+}

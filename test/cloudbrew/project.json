@@ -1,0 +1,11 @@
+{
+  "name": "CloudBrew Coffee Platform",
+  "description": "Architecture diagrams for the CloudBrew cloud-native coffee ordering platform",
+  "version": "1.0",
+  "defaults": {
+    "theme": "default"
+  },
+  "metadata": {
+    "author": "Architecture Team"
+  }
+}

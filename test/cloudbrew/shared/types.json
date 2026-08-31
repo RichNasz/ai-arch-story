@@ -1,0 +1,22 @@
+{
+  "types": {
+    "kafka-topic": {
+      "label": "Kafka Topic",
+      "shape": "parallelogram",
+      "accentColor": "#D97706",
+      "description": "An Apache Kafka event topic or stream"
+    },
+    "redis-cache": {
+      "label": "Redis Cache",
+      "shape": "cylinder",
+      "accentColor": "#DC2626",
+      "description": "In-memory Redis cache layer"
+    },
+    "cloud-native": {
+      "label": "Cloud Native App",
+      "shape": "cloud-native",
+      "accentColor": "#0EA5E9",
+      "description": "Cloud-native containerized application"
+    }
+  }
+}

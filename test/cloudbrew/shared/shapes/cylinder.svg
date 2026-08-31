@@ -1,0 +1,16 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Custom cylinder that overrides the built-in programmatic one -->
+  <!-- Barrel body -->
+  <path d="M15 25 L15 75" stroke="currentColor" stroke-width="2.5" fill="none"/>
+  <path d="M85 25 L85 75" stroke="currentColor" stroke-width="2.5" fill="none"/>
+  <!-- Top ellipse (full) -->
+  <ellipse cx="50" cy="25" rx="35" ry="12"
+           fill="none" stroke="currentColor" stroke-width="2.5"/>
+  <!-- Bottom ellipse (half, front arc only) -->
+  <path d="M15 75 C15 87 85 87 85 75"
+        fill="none" stroke="currentColor" stroke-width="2.5"/>
+  <!-- Data lines inside barrel -->
+  <line x1="28" y1="45" x2="72" y2="45" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+  <line x1="28" y1="55" x2="72" y2="55" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+  <line x1="28" y1="65" x2="58" y2="65" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+</svg>

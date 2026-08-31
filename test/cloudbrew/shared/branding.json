@@ -1,0 +1,21 @@
+{
+  "organization": "Red Hat",
+  "logo": {
+    "src": "logo.svg",
+    "alt": "Red Hat logo",
+    "placement": "header",
+    "height": 32
+  },
+  "colors": {
+    "primary": "#EE0000",
+    "secondary": "#292929"
+  },
+  "typography": {
+    "fontFamily": "\"Red Hat Display\", \"Red Hat Text\", sans-serif",
+    "monoFontFamily": "\"Red Hat Mono\", monospace"
+  },
+  "footer": {
+    "text": "Red Hat — CloudBrew Architecture Team",
+    "showGeneratedDate": true
+  }
+}

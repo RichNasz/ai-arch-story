@@ -1,0 +1,431 @@
+{
+  "version": "1.0",
+  "title": "CloudBrew — System Overview",
+  "description": "High-level view of all major components in the CloudBrew coffee ordering platform",
+  "theme": "default",
+  "viewport": {
+    "width": 3456.0,
+    "height": 2234.0
+  },
+  "nodes": [
+    {
+      "id": "mobile-app",
+      "label": "Mobile App",
+      "type": "frontend",
+      "icon": "Mobile Device",
+      "style": null,
+      "position": null,
+      "metadata": {
+        "description": "Customer-facing mobile application for ordering coffee",
+        "technology": "React Native"
+      }
+    },
+    {
+      "id": "web-app",
+      "label": "Web App",
+      "type": "frontend",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "React",
+        "description": "Customer-facing web application"
+      }
+    },
+    {
+      "id": "api-gateway",
+      "label": "API Gateway",
+      "type": "gateway",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "Kong",
+        "description": "Central API gateway handling auth, rate limiting, and routing"
+      }
+    },
+    {
+      "id": "order-service",
+      "label": "Order Service",
+      "type": "service",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "Node.js",
+        "description": "Manages order lifecycle from creation to completion"
+      }
+    },
+    {
+      "id": "menu-service",
+      "label": "Menu Service",
+      "type": "service",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "description": "Serves menu items, pricing, and availability",
+        "technology": "Go"
+      }
+    },
+    {
+      "id": "inventory-service",
+      "label": "Inventory Service",
+      "type": "service",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "Rust",
+        "description": "Tracks ingredient stock levels across all locations"
+      }
+    },
+    {
+      "id": "notification-service",
+      "label": "Notification Service",
+      "type": "service",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "Python",
+        "description": "Sends push notifications, emails, and SMS to customers"
+      }
+    },
+    {
+      "id": "orders-db",
+      "label": "Orders DB",
+      "type": "datastore",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "description": "Persistent storage for all order data",
+        "technology": "PostgreSQL"
+      }
+    },
+    {
+      "id": "menu-db",
+      "label": "Menu DB",
+      "type": "datastore",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "PostgreSQL",
+        "description": "Menu items, categories, and pricing"
+      }
+    },
+    {
+      "id": "inventory-db",
+      "label": "Inventory DB",
+      "type": "datastore",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "PostgreSQL",
+        "description": "Stock levels and reorder thresholds"
+      }
+    },
+    {
+      "id": "event-bus",
+      "label": "Event Bus",
+      "type": "queue",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "description": "Central event backbone for async communication",
+        "technology": "Apache Kafka"
+      }
+    },
+    {
+      "id": "payment-provider",
+      "label": "Payment Provider",
+      "type": "external",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "technology": "Stripe",
+        "description": "Third-party payment processing"
+      }
+    },
+    {
+      "id": "loyalty-program",
+      "label": "Loyalty Program",
+      "type": "external",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "description": "External loyalty points and rewards system",
+        "technology": "Partner API"
+      }
+    },
+    {
+      "id": "cdn",
+      "label": "CDN",
+      "type": "storage",
+      "icon": null,
+      "style": null,
+      "position": null,
+      "metadata": {
+        "description": "Static asset delivery for menu images and app resources",
+        "technology": "CloudFront"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-mobile-gw",
+      "from": "mobile-app",
+      "to": "api-gateway",
+      "label": "REST/GraphQL",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-web-gw",
+      "from": "web-app",
+      "to": "api-gateway",
+      "label": "REST/GraphQL",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-gw-order",
+      "from": "api-gateway",
+      "to": "order-service",
+      "label": "Orders API",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-gw-menu",
+      "from": "api-gateway",
+      "to": "menu-service",
+      "label": "Menu API",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-order-db",
+      "from": "order-service",
+      "to": "orders-db",
+      "label": "SQL",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-db-order",
+      "from": "orders-db",
+      "to": "order-service",
+      "label": "Confirmed",
+      "direction": "one-way",
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-menu-db",
+      "from": "menu-service",
+      "to": "menu-db",
+      "label": "SQL",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-inv-db",
+      "from": "inventory-service",
+      "to": "inventory-db",
+      "label": "SQL",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-order-bus",
+      "from": "order-service",
+      "to": "event-bus",
+      "label": "Publish events",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-bus-inv",
+      "from": "event-bus",
+      "to": "inventory-service",
+      "label": "Consume events",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-bus-notif",
+      "from": "event-bus",
+      "to": "notification-service",
+      "label": "Consume events",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-order-pay",
+      "from": "order-service",
+      "to": "payment-provider",
+      "label": "Process payment",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-order-loyalty",
+      "from": "order-service",
+      "to": "loyalty-program",
+      "label": "Award points",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-web-cdn",
+      "from": "web-app",
+      "to": "cdn",
+      "label": "Static assets",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "e-mobile-cdn",
+      "from": "mobile-app",
+      "to": "cdn",
+      "label": "Static assets",
+      "direction": null,
+      "style": null,
+      "metadata": {}
+    }
+  ],
+  "flows": [
+    {
+      "id": "order-flow",
+      "label": "New Order",
+      "description": "Customer places a coffee order through the mobile app",
+      "steps": [
+        {
+          "edge": "e-mobile-gw",
+          "label": "Place order",
+          "description": "Customer submits their coffee order from the mobile app, which sends a REST request to the API Gateway.",
+          "parallel": null
+        },
+        {
+          "edge": "e-gw-order",
+          "label": "Create order",
+          "description": "API Gateway authenticates the request and routes it to the Order Service via the Orders API.",
+          "parallel": null
+        },
+        {
+          "edge": "e-order-db",
+          "label": "Persist order",
+          "description": "Order Service validates the order details and writes the new order record to PostgreSQL.",
+          "parallel": null
+        },
+        {
+          "edge": "e-db-order",
+          "label": "Order confirmed",
+          "description": "Database confirms the write succeeded and returns the order ID to the Order Service.",
+          "parallel": null
+        },
+        {
+          "edge": "e-order-pay",
+          "label": "Charge card",
+          "description": "Order Service sends a payment request to Stripe to charge the customer's saved card.",
+          "parallel": true
+        },
+        {
+          "edge": "e-order-bus",
+          "label": "OrderCreated event",
+          "description": "Order Service publishes an OrderCreated event to Kafka, triggering downstream services like inventory and notifications.",
+          "parallel": null
+        }
+      ],
+      "style": {
+        "color": "#10B981",
+        "speed": "normal",
+        "animation": "highlight"
+      },
+      "metadata": {}
+    }
+  ],
+  "groups": [
+    {
+      "id": "frontend",
+      "label": "Client Tier",
+      "nodes": [
+        "mobile-app",
+        "web-app",
+        "api-gateway",
+        "cdn"
+      ],
+      "groups": [],
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "backend-services",
+      "label": "Backend Services",
+      "nodes": [
+        "order-service",
+        "menu-service",
+        "inventory-service",
+        "notification-service"
+      ],
+      "groups": [],
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "data-tier",
+      "label": "Data Tier",
+      "nodes": [
+        "orders-db",
+        "menu-db",
+        "inventory-db",
+        "event-bus"
+      ],
+      "groups": [],
+      "style": null,
+      "metadata": {}
+    },
+    {
+      "id": "external-systems",
+      "label": "External Systems",
+      "nodes": [
+        "payment-provider",
+        "loyalty-program"
+      ],
+      "groups": [],
+      "style": null,
+      "metadata": {}
+    }
+  ],
+  "custom_types": {
+    "types": {
+      "service": {
+        "accentColor": "#1D4ED8"
+      }
+    }
+  },
+  "branding": null,
+  "metadata": {
+    "author": "Architecture Team"
+  }
+}
