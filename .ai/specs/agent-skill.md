@@ -98,6 +98,18 @@ curl -s -X POST http://localhost:8080/api/v1/diagrams/{name}/render
 
 **Error handling**: All mutation endpoints validate before persisting. A 422 response means validation failed — the error message describes what's wrong. The agent should parse the error and fix the issue.
 
+**Completion gate**: An agent must not report a diagram created or updated
+successfully until it has validated and rendered it. With `serve` available,
+call `POST /api/v1/diagrams/{name}/validate` and then
+`POST /api/v1/diagrams/{name}/render`, and confirm the render response names
+the output HTML. Without the service, run
+`ai-arch-story render diagrams/{name}/diagram.json` and confirm the generated
+HTML exists. JSON parsing and reference checks alone do not satisfy this gate.
+
+**Schema verification**: Never use an unknown or guessed field. If no current
+validator is available, copy the shape for the relevant object from a
+known-good `diagram.json` produced by the same AI Arch Story version.
+
 **Coexistence with web editor**: The agent and web editor use the same API. The server reads from disk on every request, so both see the same state. If a user edits a node in the web editor and then asks the agent to add a flow, the agent's next API call will see the web editor's changes.
 
 ## Conversational Patterns

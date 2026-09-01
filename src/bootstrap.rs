@@ -777,6 +777,42 @@ mod tests {
     }
 
     #[test]
+    fn generated_schema_guidance_defines_the_executable_flow_shape() {
+        let workspace = TestWorkspace::new("flow-contract");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        run_start(workspace.root.clone(), None, true, &mut input, &mut output)
+            .expect("initialize workspace");
+
+        let guidance = fs::read_to_string(workspace.root.join(".ai/specs/diagram-schema.md"))
+            .expect("read schema guidance");
+        assert!(guidance.contains("\"steps\": [\n    { \"edge\": \"edge-id\", \"label\": null, \"description\": null, \"parallel\": null }"));
+        assert!(guidance
+            .contains("\"style\": { \"color\": null, \"speed\": null, \"animation\": \"pulse\" }"));
+        assert!(guidance.contains("not an array of edge-ID strings"));
+        assert!(guidance.contains("configuration belongs inside `style`"));
+    }
+
+    #[test]
+    fn generated_agent_workflow_requires_validation_and_rendering() {
+        let workspace = TestWorkspace::new("render-completion-gate");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        run_start(workspace.root.clone(), None, true, &mut input, &mut output)
+            .expect("initialize workspace");
+
+        let guidance = fs::read_to_string(workspace.root.join(".ai/specs/agent-workflow.md"))
+            .expect("read workflow guidance");
+        assert!(guidance.contains("must not report a diagram created or\nupdated successfully"));
+        assert!(guidance.contains("POST /api/v1/diagrams/{name}/validate"));
+        assert!(guidance.contains("POST /api/v1/diagrams/{name}/render"));
+        assert!(guidance.contains("ai-arch-story render diagrams/<name>/diagram.json"));
+        assert!(guidance.contains("unknown or guessed fields"));
+    }
+
+    #[test]
     fn context_directory_file_conflict_refuses_initialization_without_writes() {
         let workspace = TestWorkspace::new("context-directory-conflict");
         fs::write(workspace.root.join(".ai"), "not a directory").expect("create conflicting file");
