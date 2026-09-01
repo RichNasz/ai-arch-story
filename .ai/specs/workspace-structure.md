@@ -18,6 +18,16 @@ Users will create multiple diagrams that are often thematically related (e.g., a
 
 ```
 <user-chosen-path>/                     # Project root (thematic collection)
+├── AGENTS.md                           # Agent instructions for this user workspace
+├── .ai/specs/                          # Self-contained workspace-agent guidance
+│   ├── README.md                       # Read first; context index and rules
+│   ├── workspace-purpose.md
+│   ├── workspace-structure.md
+│   ├── diagram-schema.md
+│   ├── visual-design.md
+│   ├── flow-visualization.md
+│   ├── custom-types.md
+│   └── agent-workflow.md
 ├── project.json                        # Project-level metadata and shared config
 ├── shared/                             # Shared assets across all diagrams in this project
 │   ├── theme.json                      # Shared visual theme overrides
@@ -46,6 +56,11 @@ The user specifies the project root path. This is the top-level folder for a the
 - `~/architectures/ecommerce-platform/`
 - `./docs/architecture/cloud-migration/`
 - `/shared/team/diagrams/q3-redesign/`
+
+The root is user-owned. AI Arch Story initializes and serves it, but it is not
+an AI Arch Story source checkout. `AGENTS.md` and `.ai/specs/` tell coding
+agents how to work on its diagrams and shared assets; they do not authorize
+agents to change the AI Arch Story tool project.
 
 ### project.json
 
@@ -190,9 +205,10 @@ When the toolchain builds a diagram, it resolves properties in this order (later
 
 When the user starts a session, the agent should:
 
-1. Ask where to store content (or use a previously established path)
-2. Check if a `project.json` exists at that path — if so, load project context
-3. List existing diagrams in the project for reference
-4. When creating a new diagram, create the folder structure under `diagrams/`
-5. When updating shared components or theme, modify the `shared/` files
-6. After generating or updating `diagram.json`, invoke the Rust toolchain to produce the HTML output
+1. Read `AGENTS.md` and `.ai/specs/README.md` in the selected workspace
+2. Ask where to store content (or use a previously established path)
+3. Check if a `project.json` exists at that path — if so, load project context
+4. List existing diagrams in the project for reference
+5. When creating a new diagram, create the folder structure under `diagrams/`
+6. When updating shared components or theme, modify the `shared/` files
+7. After generating or updating `diagram.json`, invoke the Rust toolchain to produce the HTML output

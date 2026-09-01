@@ -18,7 +18,7 @@ Users never write JSON directly. The agent is the sole producer of diagram defin
 
 ### 1. Workspace Management
 
-- **Initialize projects** — Guide the user through `ai-arch-story start` at a user-specified path. The command confirms the resolved path and derived project name before safely creating `project.json`, `shared/`, and `diagrams/`.
+- **Initialize projects** — Guide the user through `ai-arch-story start` at a user-specified path. The command confirms the resolved path and derived project name before safely creating `AGENTS.md`, the `.ai/specs/` workspace guidance, `project.json`, `shared/`, and `diagrams/`.
 - **Discover existing projects** — Detect `project.json` to load project context
 - **Create diagrams** — Create new diagram folders with `diagram.json` under the project
 - **Navigate diagrams** — List and switch between diagrams in a project
@@ -46,6 +46,11 @@ rules by creating workspace files itself. Once `ai-arch-story serve` is
 running against that valid workspace, the agent uses the HTTP API for all
 operations. This ensures consistency with the web editor — both paths share
 the same validation and rendering pipeline.
+
+The initialized project is a user workspace, not an AI Arch Story source
+checkout. Before changing it, the agent reads its `AGENTS.md` and local
+`.ai/specs/README.md`; those files define how to manipulate its diagrams and
+shared assets.
 
 **API base**: `http://localhost:8080/api/v1` (default port; may vary)
 

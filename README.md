@@ -39,9 +39,12 @@ podman run --rm -it \
   start --workspace /workspace --name "$(basename "$PWD")"
 ```
 
-`start` creates only `project.json`, `shared/`, and `diagrams/`, then exits.
-It never initializes Git. If the directory is partially initialized, it lists
-exactly what it can repair and asks for approval.
+`start` creates `AGENTS.md`, a workspace-local `.ai/specs/` guidance bundle,
+`project.json`, `shared/`, and `diagrams/`, then exits. The guidance helps a
+coding agent work on the same user-owned workspace mounted by the container; it
+is not a copy of this repository. `start` never initializes Git. If the
+directory is partially initialized, it lists exactly what it can repair and
+asks for approval.
 
 Choose `serve` for ongoing interactive creation or editing. It requires an
 initialized project workspace, then keeps the web editor and HTTP API running;

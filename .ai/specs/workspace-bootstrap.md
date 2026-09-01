@@ -25,23 +25,38 @@ A valid workspace contains:
 
 ```text
 <workspace>/
+  AGENTS.md
+  .ai/specs/
+    README.md
+    workspace-purpose.md
+    workspace-structure.md
+    diagram-schema.md
+    visual-design.md
+    flow-visualization.md
+    custom-types.md
+    agent-workflow.md
   project.json
   shared/
   diagrams/
 ```
 
 `project.json` must parse as project metadata and contain a non-empty `name`
-and schema `version` of `1.0`. `shared` and `diagrams` must be directories.
-Bootstrap writes only `project.json` plus missing `shared/` and `diagrams/`
-directories. It does not create theme, components, glossary, type, asset,
-Git, or `.gitignore` files.
+and schema `version` of `1.0`. `shared`, `diagrams`, `.ai`, and `.ai/specs`
+must be directories. Each required agent-context file must be a non-empty
+regular file. Bootstrap writes the missing standard workspace items, including
+the agent-context bundle. It does not create theme, components, glossary, type,
+asset, Git, or `.gitignore` files.
+
+The context bundle is self-contained guidance for agents working in this
+user-owned workspace. It does not make the workspace a checkout of AI Arch
+Story and must not contain project build, release, or contributor instructions.
 
 ## Start Behavior
 
 - In an empty directory, create the valid workspace after confirmation and
   exit with the exact suggested `serve` command.
 - In a non-empty directory with no workspace metadata, warn that existing files
-  will not be changed, list the three new workspace items, and offer continue
+  will not be changed, list the missing standard workspace items, and offer continue
   or quit.
 - In a partial workspace, list only missing or invalid standard items and offer
   to repair them. Existing `project.json` and other user files are never
@@ -49,6 +64,10 @@ Git, or `.gitignore` files.
   quit rather than replacing it.
 - In a valid workspace, make no change and exit successfully with guidance to
   run `serve`.
+- Existing non-empty `AGENTS.md` and context specs are user-owned and are never
+  overwritten. Missing files are safely added during repair. If `.ai` or
+  `.ai/specs` is an existing non-directory path, bootstrap fails before writing
+  any workspace item.
 - `--yes` accepts the derived or provided values but does not bypass invalid
   `project.json` protection.
 
@@ -68,8 +87,9 @@ confirms or passes `--yes`.
 
 ## Verification
 
-Tests cover empty initialization, defaults and overrides, cancellation,
-non-empty directory confirmation, partial-workspace repair, invalid
-`project.json` refusal, idempotent valid workspaces, `--yes`, and `serve`
-failure before it binds a port. CLI help documents the distinction between
-`start` and `serve`.
+Tests cover empty initialization, creation of non-empty agent guidance,
+defaults and overrides, cancellation, non-empty directory confirmation,
+partial-workspace repair, preservation of customized guidance, empty guidance
+rejection, invalid `project.json` refusal, directory/file conflicts,
+idempotent valid workspaces, `--yes`, and `serve` failure before it binds a
+port. CLI help documents the distinction between `start` and `serve`.

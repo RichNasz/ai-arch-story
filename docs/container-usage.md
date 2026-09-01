@@ -213,11 +213,15 @@ podman run --rm -it \
   ai-arch-story start --workspace /workspace --name "My Project"
 ```
 
-`start` creates only `project.json`, `shared/`, and `diagrams/`; it does not
-create a diagram, start a server, initialize Git, or create `.gitignore`. It
-is safe to run again to repair missing standard directories, but it refuses to
-overwrite invalid `project.json`. `--yes` accepts the shown or supplied values
-without the prompt; it does not bypass invalid-metadata protection.
+`start` creates `project.json`, `shared/`, `diagrams/`, and a self-contained
+agent-context bundle (`AGENTS.md` plus `.ai/specs/`). The bundle guides coding
+agents working in the mounted, user-owned workspace; it is not a copy of this
+project's source or development instructions. `start` does not create a
+diagram, start a server, initialize Git, or create `.gitignore`. It is safe to
+run again to repair missing standard items, but it refuses to overwrite invalid
+`project.json` or existing agent guidance. `--yes` accepts the shown or
+supplied values without the prompt; it does not bypass invalid-metadata
+protection.
 
 Use `serve` for ongoing interactive editing after the workspace is initialized:
 
@@ -227,7 +231,7 @@ ai-arch-story serve [--workspace <path>] [--port <port>] [--host <host>] [--stat
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `--workspace <path>` | `.` | Initialized project workspace containing `project.json`, `shared/`, and `diagrams/`. The binary defaults to the current directory. Because the image sets `WORKDIR /workspace`, its effective default is `/workspace` when run in the container. If validation fails, `serve` exits before binding and prints the exact `start --workspace` repair command. |
+| `--workspace <path>` | `.` | Initialized project workspace containing `AGENTS.md`, `.ai/specs/`, `project.json`, `shared/`, and `diagrams/`. The binary defaults to the current directory. Because the image sets `WORKDIR /workspace`, its effective default is `/workspace` when run in the container. If validation fails, `serve` exits before binding and prints the exact `start --workspace` repair command. |
 | `--port <port>` | `8080` | Port on which the application listens inside the container. Pair it with a matching `-p` mapping to reach it from the host. |
 | `--host <host>` | `0.0.0.0` | Address on which the application listens. The default accepts connections available through the Podman port mapping. |
 | `--static-dir <path>` | Built-in editor assets | Development-only override for the location of the web-editor static files. Do not use it for normal container operation. |

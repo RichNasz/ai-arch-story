@@ -138,8 +138,9 @@ The `serve` subcommand accepts:
 ## Concurrency
 
 `serve` validates its workspace before it starts. It requires a valid
-`project.json`, `shared/`, and `diagrams/` directory; on failure it exits and
-prints the exact `start --workspace` repair command. The server then reads
+`project.json`, `shared/`, `diagrams/`, and the required non-empty agent-context
+files (`AGENTS.md` and `.ai/specs/`); on failure it exits and prints the exact
+`start --workspace` repair command. The server then reads
 `diagram.json` from disk on every request — no in-memory cache. This ensures
 that if the file is modified externally (e.g., by a script or manual edit),
 the API always reflects the current state.

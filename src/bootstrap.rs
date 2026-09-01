@@ -34,6 +34,7 @@ impl ProjectMetadata {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WorkspaceItem {
     ProjectMetadata,
+    AgentContextFile(&'static str),
     SharedDirectory,
     DiagramsDirectory,
 }
@@ -45,10 +46,49 @@ pub(crate) enum WorkspaceStatus {
         missing: Vec<WorkspaceItem>,
     },
     InvalidProjectMetadata {
-        error: String,
+        errors: Vec<String>,
         missing: Vec<WorkspaceItem>,
     },
 }
+
+const AGENT_CONTEXT_FILES: [(&str, &str); 9] = [
+    (
+        "AGENTS.md",
+        include_str!("../templates/workspace-context/AGENTS.md"),
+    ),
+    (
+        ".ai/specs/README.md",
+        include_str!("../templates/workspace-context/.ai/specs/README.md"),
+    ),
+    (
+        ".ai/specs/workspace-purpose.md",
+        include_str!("../templates/workspace-context/.ai/specs/workspace-purpose.md"),
+    ),
+    (
+        ".ai/specs/workspace-structure.md",
+        include_str!("../templates/workspace-context/.ai/specs/workspace-structure.md"),
+    ),
+    (
+        ".ai/specs/diagram-schema.md",
+        include_str!("../templates/workspace-context/.ai/specs/diagram-schema.md"),
+    ),
+    (
+        ".ai/specs/visual-design.md",
+        include_str!("../templates/workspace-context/.ai/specs/visual-design.md"),
+    ),
+    (
+        ".ai/specs/flow-visualization.md",
+        include_str!("../templates/workspace-context/.ai/specs/flow-visualization.md"),
+    ),
+    (
+        ".ai/specs/custom-types.md",
+        include_str!("../templates/workspace-context/.ai/specs/custom-types.md"),
+    ),
+    (
+        ".ai/specs/agent-workflow.md",
+        include_str!("../templates/workspace-context/.ai/specs/agent-workflow.md"),
+    ),
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StartChoice {
@@ -74,7 +114,8 @@ pub(crate) fn run_start<R: BufRead, W: Write>(
         writeln!(output, "Project name: {name}").map_err(|error| error.to_string())?;
 
         match inspect_workspace(&workspace) {
-            WorkspaceStatus::InvalidProjectMetadata { error, .. } => {
+            WorkspaceStatus::InvalidProjectMetadata { errors, .. } => {
+                let error = errors.join("; ");
                 writeln!(output, "Cannot initialize workspace: {error}")
                     .map_err(|write_error| write_error.to_string())?;
                 return Err(error);
@@ -140,6 +181,14 @@ fn initialize_workspace(workspace: &Path, name: &str) -> Result<(), String> {
         return Ok(());
     };
 
+    if missing
+        .iter()
+        .any(|item| matches!(item, WorkspaceItem::AgentContextFile(_)))
+    {
+        fs::create_dir_all(workspace.join(".ai/specs"))
+            .map_err(|error| format!("could not create .ai/specs/: {error}"))?;
+    }
+
     for item in missing {
         match item {
             WorkspaceItem::ProjectMetadata => {
@@ -150,6 +199,18 @@ fn initialize_workspace(workspace: &Path, name: &str) -> Result<(), String> {
                     .map_err(|error| format!("could not create project.json: {error}"))?;
                 serde_json::to_writer_pretty(file, &ProjectMetadata::new(name))
                     .map_err(|error| format!("could not write project.json: {error}"))?;
+            }
+            WorkspaceItem::AgentContextFile(path) => {
+                let (_, contents) = AGENT_CONTEXT_FILES
+                    .iter()
+                    .find(|(candidate, _)| *candidate == path)
+                    .expect("agent context file must have template");
+                fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(workspace.join(path))
+                    .and_then(|mut file| file.write_all(contents.as_bytes()))
+                    .map_err(|error| format!("could not create {path}: {error}"))?;
             }
             WorkspaceItem::SharedDirectory => fs::create_dir(workspace.join("shared"))
                 .map_err(|error| format!("could not create shared/: {error}"))?,
@@ -219,6 +280,7 @@ fn resolve_workspace(workspace: &Path) -> Result<PathBuf, String> {
 fn workspace_item_label(item: WorkspaceItem) -> &'static str {
     match item {
         WorkspaceItem::ProjectMetadata => "project.json",
+        WorkspaceItem::AgentContextFile(path) => path,
         WorkspaceItem::SharedDirectory => "shared/",
         WorkspaceItem::DiagramsDirectory => "diagrams/",
     }
@@ -233,7 +295,7 @@ fn serve_guidance(workspace: &Path) -> String {
 
 pub(crate) fn inspect_workspace(workspace: &Path) -> WorkspaceStatus {
     let project_json = workspace.join("project.json");
-    let metadata_error = if project_json.exists() {
+    let mut errors = if project_json.exists() {
         let metadata = match fs::read_to_string(&project_json) {
             Ok(contents) => serde_json::from_str::<ProjectMetadata>(&contents)
                 .map_err(|error| format!("project.json is not valid JSON: {error}")),
@@ -243,8 +305,11 @@ pub(crate) fn inspect_workspace(workspace: &Path) -> WorkspaceStatus {
         metadata
             .and_then(|metadata| metadata.validate().map(|()| metadata))
             .err()
+            .map(|error| format!("project.json: {error}"))
+            .into_iter()
+            .collect::<Vec<_>>()
     } else {
-        None
+        Vec::new()
     };
 
     let mut missing = Vec::new();
@@ -258,8 +323,30 @@ pub(crate) fn inspect_workspace(workspace: &Path) -> WorkspaceStatus {
         missing.push(WorkspaceItem::DiagramsDirectory);
     }
 
-    if let Some(error) = metadata_error {
-        WorkspaceStatus::InvalidProjectMetadata { error, missing }
+    for directory in [".ai", ".ai/specs"] {
+        let path = workspace.join(directory);
+        if path.exists() && !path.is_dir() {
+            errors.push(format!("{directory} must be a directory"));
+        }
+    }
+    for (path, _) in AGENT_CONTEXT_FILES {
+        let context_path = workspace.join(path);
+        match fs::metadata(&context_path) {
+            Ok(metadata) if metadata.is_file() => match fs::read_to_string(&context_path) {
+                Ok(contents) if !contents.trim().is_empty() => {}
+                Ok(_) => errors.push(format!("{path} must be non-empty")),
+                Err(error) => errors.push(format!("could not read {path}: {error}")),
+            },
+            Ok(_) => errors.push(format!("{path} must be a regular file")),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                missing.push(WorkspaceItem::AgentContextFile(path));
+            }
+            Err(error) => errors.push(format!("could not inspect {path}: {error}")),
+        }
+    }
+
+    if !errors.is_empty() {
+        WorkspaceStatus::InvalidProjectMetadata { errors, missing }
     } else if missing.is_empty() {
         WorkspaceStatus::Valid
     } else {
@@ -275,8 +362,8 @@ pub(crate) fn validate_serve_workspace(workspace: &Path) -> Result<PathBuf, Stri
             .into_iter()
             .map(|item| workspace_item_label(item).to_string())
             .collect(),
-        WorkspaceStatus::InvalidProjectMetadata { error, missing } => {
-            let mut issues = vec![format!("project.json: {error}")];
+        WorkspaceStatus::InvalidProjectMetadata { errors, missing } => {
+            let mut issues = errors;
             issues.extend(
                 missing
                     .into_iter()
@@ -338,8 +425,8 @@ mod tests {
     };
 
     use super::{
-        ProjectMetadata, WorkspaceItem, WorkspaceStatus, default_project_name, inspect_workspace,
-        run_start, validate_serve_workspace,
+        default_project_name, inspect_workspace, run_start, validate_serve_workspace,
+        ProjectMetadata, WorkspaceItem, WorkspaceStatus, AGENT_CONTEXT_FILES,
     };
 
     static NEXT_WORKSPACE: AtomicUsize = AtomicUsize::new(0);
@@ -376,6 +463,29 @@ mod tests {
         .expect("write project metadata");
     }
 
+    fn required_agent_context_paths() -> [&'static str; 9] {
+        [
+            "AGENTS.md",
+            ".ai/specs/README.md",
+            ".ai/specs/workspace-purpose.md",
+            ".ai/specs/workspace-structure.md",
+            ".ai/specs/diagram-schema.md",
+            ".ai/specs/visual-design.md",
+            ".ai/specs/flow-visualization.md",
+            ".ai/specs/custom-types.md",
+            ".ai/specs/agent-workflow.md",
+        ]
+    }
+
+    fn write_agent_context(root: &Path) {
+        for (path, contents) in AGENT_CONTEXT_FILES {
+            let destination = root.join(path);
+            fs::create_dir_all(destination.parent().expect("context parent"))
+                .expect("create context directory");
+            fs::write(destination, contents).expect("write agent context");
+        }
+    }
+
     #[test]
     fn empty_workspace_plans_all_standard_items_and_serializes_metadata() {
         // Removing a bootstrap item or omitting required metadata must make this test fail.
@@ -390,6 +500,15 @@ mod tests {
                     WorkspaceItem::ProjectMetadata,
                     WorkspaceItem::SharedDirectory,
                     WorkspaceItem::DiagramsDirectory,
+                    WorkspaceItem::AgentContextFile("AGENTS.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/README.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/workspace-purpose.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/workspace-structure.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/diagram-schema.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/visual-design.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/flow-visualization.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/custom-types.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/agent-workflow.md"),
                 ],
             }
         );
@@ -427,6 +546,7 @@ mod tests {
         write_project(&workspace.root, "Valid Workspace");
         fs::create_dir_all(workspace.root.join("shared")).expect("create shared directory");
         fs::create_dir_all(workspace.root.join("diagrams")).expect("create diagrams directory");
+        write_agent_context(&workspace.root);
 
         assert_eq!(inspect_workspace(&workspace.root), WorkspaceStatus::Valid);
     }
@@ -441,7 +561,18 @@ mod tests {
         assert_eq!(
             inspect_workspace(&workspace.root),
             WorkspaceStatus::Repairable {
-                missing: vec![WorkspaceItem::DiagramsDirectory],
+                missing: vec![
+                    WorkspaceItem::DiagramsDirectory,
+                    WorkspaceItem::AgentContextFile("AGENTS.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/README.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/workspace-purpose.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/workspace-structure.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/diagram-schema.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/visual-design.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/flow-visualization.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/custom-types.md"),
+                    WorkspaceItem::AgentContextFile(".ai/specs/agent-workflow.md"),
+                ],
             }
         );
     }
@@ -486,11 +617,26 @@ mod tests {
         write_project(&workspace.root, "Serve Valid Workspace");
         fs::create_dir_all(workspace.root.join("shared")).expect("create shared directory");
         fs::create_dir_all(workspace.root.join("diagrams")).expect("create diagrams directory");
+        write_agent_context(&workspace.root);
 
         assert_eq!(
             validate_serve_workspace(&workspace.root).expect("accept initialized workspace"),
             workspace.root.canonicalize().expect("resolve workspace")
         );
+    }
+
+    #[test]
+    fn serve_rejects_a_legacy_workspace_without_agent_context() {
+        let workspace = TestWorkspace::new("legacy-workspace");
+        write_project(&workspace.root, "Legacy Workspace");
+        fs::create_dir_all(workspace.root.join("shared")).expect("create shared directory");
+        fs::create_dir_all(workspace.root.join("diagrams")).expect("create diagrams directory");
+
+        let error =
+            validate_serve_workspace(&workspace.root).expect_err("reject missing agent context");
+
+        assert!(error.contains("- AGENTS.md"));
+        assert!(error.contains("- .ai/specs/README.md"));
     }
 
     #[test]
@@ -509,11 +655,9 @@ mod tests {
                 .count(),
             0
         );
-        assert!(
-            String::from_utf8(output)
-                .expect("utf8 output")
-                .contains("Initialization cancelled.")
-        );
+        assert!(String::from_utf8(output)
+            .expect("utf8 output")
+            .contains("Initialization cancelled."));
     }
 
     #[test]
@@ -527,6 +671,14 @@ mod tests {
             .expect("initialize workspace");
 
         assert_eq!(inspect_workspace(&workspace.root), WorkspaceStatus::Valid);
+        for path in required_agent_context_paths() {
+            let contents = fs::read_to_string(workspace.root.join(path))
+                .unwrap_or_else(|_| panic!("read agent context {path}"));
+            assert!(
+                !contents.trim().is_empty(),
+                "agent context {path} must be non-empty"
+            );
+        }
         assert_eq!(
             serde_json::from_str::<ProjectMetadata>(
                 &fs::read_to_string(workspace.root.join("project.json")).expect("read project")
@@ -534,18 +686,16 @@ mod tests {
             .expect("parse project"),
             ProjectMetadata::new("Payments Api")
         );
-        assert!(
-            String::from_utf8(output)
-                .expect("utf8 output")
-                .contains(&format!(
-                    "Next: ai-arch-story serve --workspace {}",
-                    workspace
-                        .root
-                        .canonicalize()
-                        .expect("resolve workspace")
-                        .display()
-                ))
-        );
+        assert!(String::from_utf8(output)
+            .expect("utf8 output")
+            .contains(&format!(
+                "Next: ai-arch-story serve --workspace {}",
+                workspace
+                    .root
+                    .canonicalize()
+                    .expect("resolve workspace")
+                    .display()
+            )));
     }
 
     #[test]
@@ -583,6 +733,63 @@ mod tests {
         assert!(output.contains("- diagrams/"));
         assert!(!output.contains("- project.json"));
         assert!(!output.contains("- shared/"));
+    }
+
+    #[test]
+    fn yes_preserves_existing_non_empty_agent_guidance() {
+        let workspace = TestWorkspace::new("custom-guidance");
+        fs::write(
+            workspace.root.join("AGENTS.md"),
+            "# Custom Workspace Rules\n",
+        )
+        .expect("write custom instructions");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        run_start(workspace.root.clone(), None, true, &mut input, &mut output)
+            .expect("initialize workspace");
+
+        assert_eq!(
+            fs::read_to_string(workspace.root.join("AGENTS.md")).expect("read instructions"),
+            "# Custom Workspace Rules\n"
+        );
+        assert_eq!(inspect_workspace(&workspace.root), WorkspaceStatus::Valid);
+    }
+
+    #[test]
+    fn empty_agent_guidance_refuses_initialization_and_serve() {
+        let workspace = TestWorkspace::new("empty-guidance");
+        fs::write(workspace.root.join("AGENTS.md"), " \n").expect("write empty instructions");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        let start_error = run_start(workspace.root.clone(), None, true, &mut input, &mut output)
+            .expect_err("reject empty guidance");
+        let serve_error = validate_serve_workspace(&workspace.root)
+            .expect_err("reject empty guidance before serving");
+
+        assert!(start_error.contains("AGENTS.md must be non-empty"));
+        assert!(serve_error.contains("AGENTS.md must be non-empty"));
+        assert_eq!(
+            fs::read_to_string(workspace.root.join("AGENTS.md")).expect("read instructions"),
+            " \n"
+        );
+    }
+
+    #[test]
+    fn context_directory_file_conflict_refuses_initialization_without_writes() {
+        let workspace = TestWorkspace::new("context-directory-conflict");
+        fs::write(workspace.root.join(".ai"), "not a directory").expect("create conflicting file");
+        let mut input = Cursor::new(Vec::<u8>::new());
+        let mut output = Vec::new();
+
+        let error = run_start(workspace.root.clone(), None, true, &mut input, &mut output)
+            .expect_err("reject context directory conflict");
+
+        assert!(error.contains(".ai must be a directory"));
+        assert!(!workspace.root.join("project.json").exists());
+        assert!(!workspace.root.join("shared").exists());
+        assert!(!workspace.root.join("diagrams").exists());
     }
 
     #[test]
