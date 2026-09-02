@@ -23,6 +23,9 @@ case "${1:-}" in
     fi
     ;;
   run) exit 0 ;;
+  inspect)
+    printf '45454\n'
+    ;;
   stop|logs) exit 0 ;;
 esac
 EOF
@@ -72,7 +75,7 @@ test_starts_owned_container_and_passes_http_override() {
   assert_contains '-p\ 127.0.0.1:3030:8080'
   assert_contains '--security-opt=no-new-privileges\ --cap-drop=ALL'
   assert_contains '--http\ --host\ 0.0.0.0\ --port\ 8080'
-  assert_contains 'curl -fsS\ -o\ /dev/null\ http://127.0.0.1:3030/mcp'
+  assert_contains 'curl -sS\ -o\ /dev/null\ http://127.0.0.1:3030/mcp'
   assert_contains 'codex -C\ '
   assert_contains 'mcp_servers.patternfly-mcp.url=\"http://127.0.0.1:3030/mcp\"'
   assert_contains 'podman stop\ ai-arch-story-patternfly-mcp'
@@ -111,8 +114,22 @@ test_preserves_codex_arguments_and_exit_status() {
   assert_contains '--model\ gpt-5.6-sol\ draw\ PatternFly\ cards'
 }
 
+test_smoke_check_uses_an_assigned_local_port_and_cleans_up() {
+  echo 'test_smoke_check_uses_an_assigned_local_port_and_cleans_up'
+  : >"$TEST_LOG"
+  PODMAN_SCENARIO=absent PATH="$TEST_BIN:$PATH" TEST_LOG="$TEST_LOG" "$REPO_ROOT/scripts/check-patternfly-mcp-http.sh"
+  assert_contains 'podman run\ --rm\ -d\ --name\ ai-arch-story-patternfly-mcp-check-'
+  assert_contains '-p\ 127.0.0.1::8080'
+  assert_contains 'podman inspect\ --format'
+  assert_contains '-H\ Host:\ 127.0.0.1:3030'
+  assert_contains '-H\ Accept:\ application/json\,\ text/event-stream'
+  assert_contains 'curl -sS\ -o\ /dev/null\ -H\ Host:\ 127.0.0.1:3030\ -H\ Accept:\ application/json\,\ text/event-stream\ http://127.0.0.1:45454/mcp'
+  assert_contains 'podman stop\ ai-arch-story-patternfly-mcp-check-'
+}
+
 test_starts_owned_container_and_passes_http_override
 test_reuses_conforming_container_without_stopping_it
 test_rejects_conflicting_running_container_before_codex
 test_preserves_codex_arguments_and_exit_status
+test_smoke_check_uses_an_assigned_local_port_and_cleans_up
 echo 'PASS'

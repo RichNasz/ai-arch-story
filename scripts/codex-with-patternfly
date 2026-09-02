@@ -49,7 +49,7 @@ if [[ -z "${existing:-}" || "${existing_running:-}" != true ]]; then
 fi
 
 for _ in $(seq 1 30); do
-  if curl -fsS -o /dev/null "$MCP_URL"; then
+  if curl -sS -o /dev/null "$MCP_URL"; then
     ready=1
     break
   fi
