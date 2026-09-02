@@ -32,7 +32,6 @@ This directory contains the source-of-truth specifications for the AI Arch Story
 | [public-release-remediation.md](public-release-remediation.md) | **Draft** | Security, provenance, build-context, and API-contract remediation for the public repository | web-api, workspace-structure, export-format, container-modes, open-source-distribution |
 | [workspace-bootstrap.md](workspace-bootstrap.md) | **Draft** | `start` initialization and `serve` workspace validation contract | workspace-structure, container-modes, agent-skill |
 | [custom-types.md](custom-types.md) | **Done** | User-definable node types, SVG shape imports, type libraries, inheritance | diagram-schema, workspace-structure, web-api, web-editor, visual-design |
-| [patternfly-mcp-integration.md](patternfly-mcp-integration.md) | **Done** | Project-scoped Codex launcher for a local HTTP PatternFly MCP server | container-modes |
 
 ## Status Definitions
 

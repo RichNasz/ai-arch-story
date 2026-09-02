@@ -130,27 +130,6 @@ The project instructions in [AGENTS.md](AGENTS.md) and
 shared API workflow. See the [agent workflow spec](.ai/specs/agent-skill.md)
 and [container modes spec](.ai/specs/container-modes.md) for details.
 
-### PatternFly MCP for Codex
-
-For this repository's PatternFly web-editor work, start Codex through the
-project launcher:
-
-```bash
-scripts/codex-with-patternfly
-```
-
-It starts (or safely reuses) a local PatternFly MCP HTTP container bound only
-to `127.0.0.1`, waits for its `/mcp` endpoint, and configures that endpoint for
-the Codex process it launches. It does not modify global Codex configuration,
-so the tool is unavailable to other projects. The local
-`localhost/patternfly-mcp:latest` image is required.
-
-Verify the HTTP setup independently with:
-
-```bash
-bash scripts/check-patternfly-mcp-http.sh
-```
-
 ## Architecture
 
 ```text
