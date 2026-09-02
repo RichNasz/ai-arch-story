@@ -21,7 +21,7 @@ export function EditorSidebar({ diagramName, onChange, onError }: Props) {
       <Tabs
         activeKey={activeTab}
         onSelect={(_e, key) => setActiveTab(key)}
-        isBox
+        isVertical
         style={{ marginBottom: '16px' }}
       >
         <Tab eventKey="nodes" title={<TabTitleText>Nodes</TabTitleText>}>

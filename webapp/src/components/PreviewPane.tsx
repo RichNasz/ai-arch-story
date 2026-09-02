@@ -5,6 +5,7 @@ import {
   EmptyStateActions,
   EmptyStateFooter,
   Button,
+  Alert,
 } from '@patternfly/react-core';
 import { EyeIcon } from '@patternfly/react-icons';
 import { api } from '../api';
@@ -13,9 +14,11 @@ interface Props {
   diagramName: string;
   refreshKey: number;
   hasOutput: boolean;
+  isStale: boolean;
+  onRender: () => Promise<void>;
 }
 
-export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
+export function PreviewPane({ diagramName, refreshKey, hasOutput, isStale, onRender }: Props) {
   const [hasRendered, setHasRendered] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,7 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
     setRendering(true);
     setError(null);
     try {
-      await api.render(diagramName);
+      await onRender();
       setHasRendered(true);
     } catch (e) {
       setError(`${e}`);
@@ -59,7 +62,9 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
   }
 
   return (
-    <iframe
+    <div style={{ height: '100%', minHeight: 0, position: 'relative' }}>
+      {isStale && <Alert isInline variant="info" title="Preview is out of date. Select Re-layout to update it." style={{ position: 'absolute', inset: '16px 16px auto', zIndex: 1 }} />}
+      <iframe
       src={previewUrl}
       title="Diagram Preview"
       style={{
@@ -67,7 +72,9 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
         height: '100%',
         border: 'none',
         backgroundColor: '#fff',
+        display: 'block',
       }}
-    />
+      />
+    </div>
   );
 }

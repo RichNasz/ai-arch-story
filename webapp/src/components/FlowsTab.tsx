@@ -25,6 +25,7 @@ import type { DiagramFlow, DiagramEdge, FlowStep, FlowSpeed, FlowAnimation } fro
 import { api } from '../api';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { MetadataFields } from './MetadataFields';
+import { ElementEmptyState } from './ElementEmptyState';
 
 const SPEEDS: FlowSpeed[] = ['slow', 'normal', 'fast'];
 const ANIMATIONS: FlowAnimation[] = ['pulse', 'particle', 'highlight'];
@@ -138,10 +139,10 @@ export function FlowsTab({ diagramName, onChange, onError }: Props) {
 
   return (
     <>
-      <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
+      {flows.length > 0 && <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
         Add Flow
-      </Button>
-      <DataList aria-label="Flows" isCompact>
+      </Button>}
+      {flows.length === 0 ? <ElementEmptyState title="No flows yet" description="Add a flow to explain how work moves through the architecture." actionLabel="Add flow" onCreate={openAdd} /> : <DataList aria-label="Flows" isCompact>
         {flows.map(flow => (
           <DataListItem key={flow.id} id={flow.id}>
             <DataListItemRow>
@@ -161,7 +162,7 @@ export function FlowsTab({ diagramName, onChange, onError }: Props) {
             </DataListItemRow>
           </DataListItem>
         ))}
-      </DataList>
+      </DataList>}
 
       <ConfirmDeleteModal
         isOpen={!!deleteTarget}

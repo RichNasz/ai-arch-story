@@ -12,6 +12,7 @@ import {
   MenuToggleElement,
   Button,
   Alert,
+  AlertGroup,
   AlertActionCloseButton,
   Toolbar,
   ToolbarContent,
@@ -41,6 +42,9 @@ export function App() {
   const [validation, setValidation] = useState<'unknown' | 'valid' | 'invalid'>('unknown');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [outputUrl, setOutputUrl] = useState<string>();
+  const [isRendering, setIsRendering] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [previewStale, setPreviewStale] = useState(false);
 
   const loadDiagrams = useCallback(async () => {
     try {
@@ -58,19 +62,22 @@ export function App() {
 
   const handleRender = async () => {
     if (!selectedDiagram) return;
+    setIsRendering(true);
     try {
       const result = await api.render(selectedDiagram);
       setAlert({ variant: 'success', title: `Rendered: ${result.outputPath}` });
       setOutputUrl(api.getPreviewUrl(selectedDiagram));
       setDiagrams(current => current.map(d => d.name === selectedDiagram ? { ...d, hasOutput: true } : d));
       setRefreshKey(k => k + 1);
+      setPreviewStale(false);
     } catch (e) {
       setAlert({ variant: 'danger', title: `Render failed: ${e}` });
-    }
+    } finally { setIsRendering(false); }
   };
 
   const handleValidate = async () => {
     if (!selectedDiagram) return;
+    setIsValidating(true);
     try {
       await api.validate(selectedDiagram);
       setValidation('valid');
@@ -78,21 +85,14 @@ export function App() {
     } catch (e) {
       setValidation('invalid');
       setAlert({ variant: 'danger', title: `Validation failed: ${e}` });
-    }
+    } finally { setIsValidating(false); }
   };
 
   const handleChange = async () => {
     if (!selectedDiagram) return;
     setLastSaved(new Date());
     setValidation('unknown');
-    try {
-      await api.render(selectedDiagram);
-      setDiagrams(current => current.map(d => d.name === selectedDiagram ? { ...d, hasOutput: true } : d));
-      setOutputUrl(api.getPreviewUrl(selectedDiagram));
-      setRefreshKey(k => k + 1);
-    } catch (e) {
-      setAlert({ variant: 'danger', title: `Saved, but preview refresh failed: ${e}` });
-    }
+    setPreviewStale(true);
   };
 
   const handleCreate = async (name: string, title: string) => {
@@ -101,6 +101,8 @@ export function App() {
       setDiagrams(current => [...current, { name, title, hasOutput: false }].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedDiagram(name);
       setRefreshKey(0);
+      setPreviewStale(false);
+      setOutputUrl(undefined);
       setCreateOpen(false);
       setAlert({ variant: 'success', title: `Created ${title}` });
     } catch (e) {
@@ -148,6 +150,8 @@ export function App() {
                     onSelect={(_e, value) => {
                       setSelectedDiagram(value as string);
                       setRefreshKey(0);
+                      setPreviewStale(false);
+                      setOutputUrl(undefined);
                       setSelectOpen(false);
                     }}
                     onOpenChange={setSelectOpen}
@@ -161,12 +165,12 @@ export function App() {
                   </Select>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <Button variant="secondary" onClick={handleValidate} isDisabled={!selectedDiagram}>
+                  <Button variant="secondary" onClick={handleValidate} isDisabled={!selectedDiagram || isValidating} isLoading={isValidating}>
                     Validate
                   </Button>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <Button variant="primary" onClick={handleRender} isDisabled={!selectedDiagram}>
+                  <Button variant="primary" onClick={handleRender} isDisabled={!selectedDiagram || isRendering} isLoading={isRendering}>
                     Re-layout
                   </Button>
                 </ToolbarItem>
@@ -178,7 +182,7 @@ export function App() {
     >
       {/* Tighter padding than default PageSection for the dismissable alert banner */}
       {alert && (
-        <PageSection padding={{ default: 'noPadding' }} style={{ padding: '8px 16px' }}>
+        <AlertGroup isToast isLiveRegion aria-label="Editor notifications">
           <Alert
             variant={alert.variant}
             title={alert.title}
@@ -186,11 +190,11 @@ export function App() {
             timeout={5000}
             onTimeout={() => setAlert(null)}
           />
-        </PageSection>
+        </AlertGroup>
       )}
-      <PageSection isFilled padding={{ default: 'noPadding' }} style={{ height: 'calc(100vh - 112px)' }}>
+      <PageSection isFilled hasBodyWrapper={false} padding={{ default: 'noPadding' }} style={{ height: 'calc(100vh - 112px)', minHeight: 0 }}>
         {selectedDiagram ? (
-          <Split hasGutter style={{ height: '100%' }}>
+            <Split hasGutter style={{ height: '100%', minHeight: 0 }}>
             <SplitItem style={{ width: '380px', overflow: 'auto', borderRight: '1px solid var(--pf-t--global--border--color--default)' }}>
               <EditorSidebar
                 diagramName={selectedDiagram}
@@ -198,12 +202,14 @@ export function App() {
                 onError={handleSidebarError}
               />
             </SplitItem>
-            <SplitItem isFilled style={{ position: 'relative' }}>
+            <SplitItem isFilled style={{ position: 'relative', height: '100%', minHeight: 0 }}>
               <PreviewPane
                 key={selectedDiagram}
                 diagramName={selectedDiagram}
                 refreshKey={refreshKey}
                 hasOutput={diagrams.find(d => d.name === selectedDiagram)?.hasOutput ?? false}
+                isStale={previewStale}
+                onRender={handleRender}
               />
             </SplitItem>
           </Split>
@@ -220,7 +226,7 @@ export function App() {
           </EmptyState>
         )}
       </PageSection>
-      <StatusBar validation={validation} lastSaved={lastSaved} outputUrl={outputUrl} />
+      <StatusBar validation={validation} lastSaved={lastSaved} outputUrl={previewStale ? undefined : outputUrl} isPreviewStale={previewStale} />
       <CreateDiagramModal isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} />
     </Page>
   );

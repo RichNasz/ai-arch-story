@@ -9,6 +9,8 @@ describe('PreviewPane', () => {
         diagramName="system-overview"
         refreshKey={0}
         hasOutput
+        isStale={false}
+        onRender={async () => {}}
       />,
     );
 

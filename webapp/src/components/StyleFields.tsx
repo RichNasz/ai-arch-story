@@ -1,4 +1,4 @@
-import { FormGroup, TextInput } from '@patternfly/react-core';
+import { FormGroup, TextInput, FormHelperText, HelperText, HelperTextItem } from '@patternfly/react-core';
 import type { StyleOverride } from '../types';
 
 interface Props {
@@ -20,7 +20,8 @@ export function StyleFields({ idPrefix, value, onChange, includeShape = false }:
   return <>
     {(['color', 'background', 'border'] as const).map(field => (
       <FormGroup key={field} label={field[0].toUpperCase() + field.slice(1)} fieldId={`${idPrefix}-${field}`}>
-        <TextInput id={`${idPrefix}-${field}`} value={value?.[field] ?? ''} onChange={(_e, v) => update(field, v)} placeholder="CSS color" />
+        <TextInput id={`${idPrefix}-${field}`} value={value?.[field] ?? ''} onChange={(_e, v) => update(field, v)} aria-describedby={`${idPrefix}-${field}-help`} />
+        <FormHelperText><HelperText><HelperTextItem id={`${idPrefix}-${field}-help`}>Enter a CSS color value, such as #0066cc or rgb(0, 102, 204).</HelperTextItem></HelperText></FormHelperText>
       </FormGroup>
     ))}
     <FormGroup label="Opacity" fieldId={`${idPrefix}-opacity`}>

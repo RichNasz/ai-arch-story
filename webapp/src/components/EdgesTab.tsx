@@ -24,6 +24,7 @@ import { api } from '../api';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { StyleFields } from './StyleFields';
 import { MetadataFields } from './MetadataFields';
+import { ElementEmptyState } from './ElementEmptyState';
 
 const DIRECTIONS: EdgeDirection[] = ['one-way', 'two-way', 'none'];
 
@@ -103,10 +104,10 @@ export function EdgesTab({ diagramName, onChange, onError }: Props) {
 
   return (
     <>
-      <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
+      {edges.length > 0 && <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
         Add Edge
-      </Button>
-      <DataList aria-label="Edges" isCompact>
+      </Button>}
+      {edges.length === 0 ? <ElementEmptyState title="No edges yet" description="Add an edge to connect nodes in the architecture." actionLabel="Add edge" onCreate={openAdd} /> : <DataList aria-label="Edges" isCompact>
         {edges.map(edge => (
           <DataListItem key={edge.id} id={edge.id}>
             <DataListItemRow>
@@ -127,7 +128,7 @@ export function EdgesTab({ diagramName, onChange, onError }: Props) {
             </DataListItemRow>
           </DataListItem>
         ))}
-      </DataList>
+      </DataList>}
 
       <ConfirmDeleteModal
         isOpen={!!deleteTarget}

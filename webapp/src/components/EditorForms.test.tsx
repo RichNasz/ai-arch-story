@@ -22,9 +22,23 @@ describe('element forms', () => {
     render(<NodesTab diagramName="system" onChange={() => {}} onError={() => {}} />);
     await user.click(await screen.findByRole('button', { name: 'Edit API' }));
 
+    await user.click(screen.getByRole('button', { name: /Appearance \(optional\)/ }));
+    await user.click(screen.getByRole('button', { name: /Metadata \(optional\)/ }));
+
     expect(screen.getByRole('textbox', { name: 'Background' })).toHaveValue('#ffffff');
     expect(screen.getByDisplayValue('owner')).toBeVisible();
     expect(screen.getByDisplayValue('platform')).toBeVisible();
+  });
+
+  it('groups optional node appearance fields and explains accepted color values', async () => {
+    const user = userEvent.setup();
+    render(<NodesTab diagramName="system" onChange={() => {}} onError={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: 'Edit API' }));
+
+    expect(screen.getByRole('heading', { name: 'Basic details' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Appearance \(optional\)/ }));
+    expect(screen.getAllByText('Enter a CSS color value, such as #0066cc or rgb(0, 102, 204).')).not.toHaveLength(0);
+    expect(document.querySelector('#node-style-color')).toHaveAttribute('aria-describedby', 'node-style-color-help');
   });
 
   it('edits every flow-step field and provides ordering controls', async () => {
