@@ -15,7 +15,7 @@ interface Props {
   refreshKey: number;
   hasOutput: boolean;
   isStale: boolean;
-  onRender: () => Promise<void>;
+  onRender: () => Promise<boolean>;
 }
 
 export function PreviewPane({ diagramName, refreshKey, hasOutput, isStale, onRender }: Props) {
@@ -28,8 +28,9 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput, isStale, onRen
     setRendering(true);
     setError(null);
     try {
-      await onRender();
-      setHasRendered(true);
+      if (await onRender()) {
+        setHasRendered(true);
+      }
     } catch (e) {
       setError(`${e}`);
     } finally {
@@ -42,7 +43,7 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput, isStale, onRen
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <EmptyState headingLevel="h3" titleText="No preview available" icon={EyeIcon}>
           <EmptyStateBody>
-            {error ?? 'Click Render in the toolbar to generate a preview, or click below.'}
+            {error ?? 'Click Re-layout in the toolbar to generate a preview, or Export HTML to generate and download it.'}
           </EmptyStateBody>
           <EmptyStateFooter>
             <EmptyStateActions>

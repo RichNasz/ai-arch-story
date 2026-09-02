@@ -45,6 +45,7 @@ export function App() {
   const [isRendering, setIsRendering] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [previewStale, setPreviewStale] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const loadDiagrams = useCallback(async () => {
     try {
@@ -60,19 +61,51 @@ export function App() {
 
   useEffect(() => { loadDiagrams(); }, [loadDiagrams]);
 
-  const handleRender = async () => {
+  const renderDiagram = async () => {
     if (!selectedDiagram) return;
+    const result = await api.render(selectedDiagram);
+    const previewUrl = api.getPreviewUrl(selectedDiagram);
+    setOutputUrl(previewUrl);
+    setDiagrams(current => current.map(d => d.name === selectedDiagram ? { ...d, hasOutput: true } : d));
+    setRefreshKey(k => k + 1);
+    setPreviewStale(false);
+    return { result, previewUrl };
+  };
+
+  const handleRender = async () => {
+    if (!selectedDiagram) return false;
     setIsRendering(true);
     try {
-      const result = await api.render(selectedDiagram);
-      setAlert({ variant: 'success', title: `Rendered: ${result.outputPath}` });
-      setOutputUrl(api.getPreviewUrl(selectedDiagram));
-      setDiagrams(current => current.map(d => d.name === selectedDiagram ? { ...d, hasOutput: true } : d));
-      setRefreshKey(k => k + 1);
-      setPreviewStale(false);
+      const rendered = await renderDiagram();
+      if (!rendered) return false;
+      setAlert({ variant: 'success', title: `Rendered: ${rendered.result.outputPath}` });
+      return true;
     } catch (e) {
       setAlert({ variant: 'danger', title: `Render failed: ${e}` });
-    } finally { setIsRendering(false); }
+      return false;
+    } finally {
+      setIsRendering(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!selectedDiagram) return;
+    setIsExporting(true);
+    try {
+      const rendered = await renderDiagram();
+      if (!rendered) return;
+      const download = document.createElement('a');
+      download.href = rendered.previewUrl;
+      download.download = `${selectedDiagram}.html`;
+      document.body.appendChild(download);
+      download.click();
+      download.remove();
+      setAlert({ variant: 'success', title: `Exported: ${rendered.result.outputPath}` });
+    } catch (e) {
+      setAlert({ variant: 'danger', title: `Render failed: ${e}` });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleValidate = async () => {
@@ -170,8 +203,13 @@ export function App() {
                   </Button>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <Button variant="primary" onClick={handleRender} isDisabled={!selectedDiagram || isRendering} isLoading={isRendering}>
+                  <Button variant="secondary" onClick={handleRender} isDisabled={!selectedDiagram || isRendering || isExporting} isLoading={isRendering}>
                     Re-layout
+                  </Button>
+                </ToolbarItem>
+                <ToolbarItem>
+                  <Button variant="primary" onClick={handleExport} isDisabled={!selectedDiagram || isExporting} isLoading={isExporting}>
+                    Export HTML
                   </Button>
                 </ToolbarItem>
               </ToolbarContent>

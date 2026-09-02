@@ -10,7 +10,7 @@ describe('PreviewPane', () => {
         refreshKey={0}
         hasOutput
         isStale={false}
-        onRender={async () => {}}
+        onRender={async () => true}
       />,
     );
 
