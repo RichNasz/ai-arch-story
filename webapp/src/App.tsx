@@ -41,6 +41,7 @@ export function App() {
   const [validation, setValidation] = useState<'unknown' | 'valid' | 'invalid'>('unknown');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [outputUrl, setOutputUrl] = useState<string>();
+  const [isExporting, setIsExporting] = useState(false);
 
   const loadDiagrams = useCallback(async () => {
     try {
@@ -56,16 +57,27 @@ export function App() {
 
   useEffect(() => { loadDiagrams(); }, [loadDiagrams]);
 
-  const handleRender = async () => {
+  const handleExport = async () => {
     if (!selectedDiagram) return;
+    setIsExporting(true);
     try {
       const result = await api.render(selectedDiagram);
-      setAlert({ variant: 'success', title: `Rendered: ${result.outputPath}` });
-      setOutputUrl(api.getPreviewUrl(selectedDiagram));
+      const previewUrl = api.getPreviewUrl(selectedDiagram);
+      const download = document.createElement('a');
+      download.href = previewUrl;
+      download.download = `${selectedDiagram}.html`;
+      document.body.appendChild(download);
+      download.click();
+      download.remove();
+
+      setAlert({ variant: 'success', title: `Exported: ${result.outputPath}` });
+      setOutputUrl(previewUrl);
       setDiagrams(current => current.map(d => d.name === selectedDiagram ? { ...d, hasOutput: true } : d));
       setRefreshKey(k => k + 1);
     } catch (e) {
       setAlert({ variant: 'danger', title: `Render failed: ${e}` });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -166,8 +178,8 @@ export function App() {
                   </Button>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <Button variant="primary" onClick={handleRender} isDisabled={!selectedDiagram}>
-                    Re-layout
+                  <Button variant="primary" onClick={handleExport} isDisabled={!selectedDiagram || isExporting} isLoading={isExporting}>
+                    Export HTML
                   </Button>
                 </ToolbarItem>
               </ToolbarContent>
