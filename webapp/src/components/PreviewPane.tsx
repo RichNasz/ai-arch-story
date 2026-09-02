@@ -39,7 +39,7 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <EmptyState headingLevel="h3" titleText="No preview available" icon={EyeIcon}>
           <EmptyStateBody>
-            {error ?? 'Click Render in the toolbar to generate a preview, or click below.'}
+            {error ?? 'Click Export HTML in the toolbar to generate a preview and download it, or click below.'}
           </EmptyStateBody>
           <EmptyStateFooter>
             <EmptyStateActions>

@@ -86,7 +86,7 @@ Where `{elements}` is one of: `nodes`, `edges`, `flows`, `groups`.
 | POST | `/api/v1/diagrams/{name}/validate` | Validate diagram without side effects |
 | POST | `/api/v1/diagrams/{name}/render` | Validate, run Graphviz layout, assemble HTML, write output file |
 | GET | `/api/v1/diagrams/{name}/render-data` | Return the `DiagramRenderData` JSON (for live preview without writing HTML) |
-| GET | `/api/v1/diagrams/{name}/preview` | Serve the most recently rendered HTML file |
+| GET | `/api/v1/diagrams/{name}/preview` | Serve the most recently rendered HTML file; the editor uses this URL to open or download the generated artifact after rendering |
 
 `POST /validate` response:
 ```json

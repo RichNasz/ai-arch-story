@@ -97,7 +97,20 @@ The preview pane renders the diagram using the same JavaScript (`renderer.js`) a
 
 **When to refresh:**
 - On save (after a successful PUT/POST/DELETE that changes the diagram)
-- Full re-layout (calls `POST /render` then refreshes render-data) only when the user clicks "Re-layout" or when nodes/edges are added/removed
+- Full re-layout (calls `POST /render` then refreshes render-data) occurs when nodes or edges are added or removed, and when the user exports HTML
+
+## HTML Export
+
+The masthead provides an **Export HTML** action for the selected diagram. It
+calls `POST /api/v1/diagrams/{name}/render`, which validates the definition,
+computes layout, and writes the portable HTML artifact to its standard output
+path. Once that succeeds, the editor initiates a browser download from the
+diagram's preview URL using `<diagram-name>.html` as the filename.
+
+The export control is disabled when no diagram is selected and while an export
+is in progress. Render or validation errors are shown in the editor's standard
+alert area and no download is started. The status bar continues to offer an
+"Open rendered diagram" link after a successful export.
 
 ## PatternFly Components
 
