@@ -155,6 +155,7 @@ The rendered HTML supports these interactions:
 ### Always Available
 - **Pan** — Click/touch and drag to move the viewport
 - **Zoom** — Scroll wheel or pinch to zoom in/out
+- **Magnification controls** — A fixed, bottom-left panel independent from the bottom-right flow controls. It contains an editable field labeled **Magnification** and a **Reset view** button. Magnification is relative to the initial fitted, centered SVG `viewBox`: `0%` is the fitted baseline (scale `1.0`), `100%` is `2×`, and `-50%` is `0.5×`. The field displays the current integer-relative magnification after wheel zoom. Users can enter an integer with an optional `%` and apply it by pressing Enter or leaving the field; values are clamped to `-90%` through `400%`, and invalid values revert to the current value. Applying magnification preserves the current viewport center. Reset view restores both `0%` and the original centered `viewBox`. Wheel zoom remains pointer-focused and updates the field; panning changes viewport position without changing magnification.
 - **Hover tooltips** — Hovering a node shows its `metadata.description` and `metadata.technology` in a tooltip
 
 ### Flow Controls (when flows are present)

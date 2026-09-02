@@ -758,11 +758,89 @@
   }
 
   // --- Pan & Zoom ---
-  var viewBox = { x: 0, y: 0, w: layout.width, h: layout.height };
+  var initialViewBox = { x: 0, y: 0, w: layout.width, h: layout.height };
+  var viewBox = { x: initialViewBox.x, y: initialViewBox.y, w: initialViewBox.w, h: initialViewBox.h };
   var isPanning = false, panStart = { x: 0, y: 0 }, panViewStart = { x: 0, y: 0 };
+  var MIN_MAGNIFICATION = -90;
+  var MAX_MAGNIFICATION = 400;
+  var magnificationInput;
 
   function updateViewBox() {
     svg.setAttribute('viewBox', viewBox.x + ' ' + viewBox.y + ' ' + viewBox.w + ' ' + viewBox.h);
+    updateMagnificationDisplay();
+  }
+
+  function currentMagnification() {
+    return ((initialViewBox.w / viewBox.w) - 1) * 100;
+  }
+
+  function updateMagnificationDisplay() {
+    if (magnificationInput) {
+      magnificationInput.value = Math.round(currentMagnification()) + '%';
+    }
+  }
+
+  function setMagnification(magnification) {
+    var clamped = Math.max(MIN_MAGNIFICATION, Math.min(MAX_MAGNIFICATION, magnification));
+    var scale = 1 + clamped / 100;
+    var centerX = viewBox.x + viewBox.w / 2;
+    var centerY = viewBox.y + viewBox.h / 2;
+    viewBox.w = initialViewBox.w / scale;
+    viewBox.h = initialViewBox.h / scale;
+    viewBox.x = centerX - viewBox.w / 2;
+    viewBox.y = centerY - viewBox.h / 2;
+    updateViewBox();
+  }
+
+  function resetView() {
+    viewBox.x = initialViewBox.x;
+    viewBox.y = initialViewBox.y;
+    viewBox.w = initialViewBox.w;
+    viewBox.h = initialViewBox.h;
+    updateViewBox();
+  }
+
+  function buildMagnificationControls() {
+    var controls = document.getElementById('magnification-controls');
+    if (!controls) return;
+
+    var label = document.createElement('label');
+    label.htmlFor = 'magnification-input';
+    label.textContent = 'Magnification';
+    controls.appendChild(label);
+
+    magnificationInput = document.createElement('input');
+    magnificationInput.id = 'magnification-input';
+    magnificationInput.type = 'text';
+    magnificationInput.inputMode = 'numeric';
+    magnificationInput.setAttribute('aria-label', 'Magnification');
+    controls.appendChild(magnificationInput);
+
+    function applyInput() {
+      var match = magnificationInput.value.trim().match(/^(-?\d+)%?$/);
+      if (!match) {
+        updateMagnificationDisplay();
+        return;
+      }
+      setMagnification(parseInt(match[1], 10));
+    }
+
+    magnificationInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyInput();
+        magnificationInput.blur();
+      }
+    });
+    magnificationInput.addEventListener('blur', applyInput);
+
+    var resetButton = document.createElement('button');
+    resetButton.id = 'reset-view-button';
+    resetButton.type = 'button';
+    resetButton.textContent = 'Reset view';
+    resetButton.addEventListener('click', resetView);
+    controls.appendChild(resetButton);
+    updateMagnificationDisplay();
   }
 
   svg.addEventListener('mousedown', function(e) {
@@ -793,8 +871,12 @@
     var mx = (e.clientX - rect.left) / rect.width;
     var my = (e.clientY - rect.top) / rect.height;
     var factor = e.deltaY > 0 ? 1.1 : 0.9;
-    var newW = viewBox.w * factor;
-    var newH = viewBox.h * factor;
+    var targetMagnification = currentMagnification();
+    targetMagnification = ((1 + targetMagnification / 100) / factor - 1) * 100;
+    targetMagnification = Math.max(MIN_MAGNIFICATION, Math.min(MAX_MAGNIFICATION, targetMagnification));
+    var targetScale = 1 + targetMagnification / 100;
+    var newW = initialViewBox.w / targetScale;
+    var newH = initialViewBox.h / targetScale;
     viewBox.x += (viewBox.w - newW) * mx;
     viewBox.y += (viewBox.h - newH) * my;
     viewBox.w = newW;
@@ -825,4 +907,5 @@
   // --- Mount SVG ---
   container.appendChild(svg);
   svg.style.cursor = 'grab';
+  buildMagnificationControls();
 })();

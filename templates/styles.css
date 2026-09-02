@@ -80,6 +80,41 @@ body {
   color: var(--text-secondary); font-size: 11px;
 }
 
+/* Magnification Controls */
+#magnification-controls {
+  position: fixed; bottom: 20px; left: 20px; z-index: 50;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--controls-bg); border: 1px solid var(--controls-border);
+  border-radius: 8px; padding: 8px 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-size: 12px;
+}
+
+#magnification-controls label {
+  color: var(--text-secondary); font-weight: 600;
+}
+
+#magnification-input {
+  width: 58px; padding: 4px 6px;
+  color: var(--text-primary); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 4px;
+  font: inherit; text-align: right;
+}
+
+#magnification-controls button {
+  padding: 4px 8px; color: var(--text-primary); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 4px;
+  font: inherit; cursor: pointer;
+}
+
+#magnification-input:focus-visible,
+#magnification-controls button:focus-visible {
+  outline: 2px solid var(--brand-primary, #3B82F6); outline-offset: 2px;
+}
+
+#magnification-controls button:hover { background: var(--border); }
+
 /* Flow Controls */
 #flow-controls {
   position: fixed; bottom: 20px; right: 20px; z-index: 50;
@@ -309,6 +344,10 @@ body {
 
 /* Responsive */
 @media (max-width: 800px) {
+  #magnification-controls {
+    bottom: 10px; left: 10px; gap: 6px; padding: 7px 8px;
+    font-size: 11px;
+  }
   #flow-controls {
     bottom: 10px; right: 10px; padding: 8px 12px;
     font-size: 11px; min-width: auto;
@@ -318,6 +357,10 @@ body {
   }
   #diagram-header { padding: 10px 16px 4px; }
   #diagram-header h1 { font-size: 16px; }
+}
+
+@media (max-width: 500px) {
+  #magnification-controls { top: 10px; bottom: auto; }
 }
 
 @media (max-width: 400px) {

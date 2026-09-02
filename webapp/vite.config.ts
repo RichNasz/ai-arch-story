@@ -8,6 +8,9 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
   },
   server: {
+    fs: {
+      allow: ['..'],
+    },
     proxy: {
       '/api': 'http://localhost:8080',
     },

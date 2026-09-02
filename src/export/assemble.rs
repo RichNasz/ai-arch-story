@@ -50,6 +50,7 @@ pub fn assemble_html_with_favicon(data: &DiagramRenderData, favicon_data_uri: Op
   <main id="diagram-container"></main>
 
   <aside id="flow-controls" hidden></aside>
+  <aside id="magnification-controls" aria-label="Magnification controls"></aside>
 
   <div id="tooltip" hidden></div>
 {footer}
