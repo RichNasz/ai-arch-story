@@ -27,6 +27,7 @@ import { api } from '../api';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { StyleFields } from './StyleFields';
 import { MetadataFields } from './MetadataFields';
+import { ElementEmptyState } from './ElementEmptyState';
 
 interface Props {
   diagramName: string;
@@ -132,10 +133,10 @@ export function GroupsTab({ diagramName, onChange, onError }: Props) {
 
   return (
     <>
-      <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
+      {groups.length > 0 && <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
         Add Group
-      </Button>
-      <DataList aria-label="Groups" isCompact>
+      </Button>}
+      {groups.length === 0 ? <ElementEmptyState title="No groups yet" description="Add a group to organize related nodes." actionLabel="Add group" onCreate={openAdd} /> : <DataList aria-label="Groups" isCompact>
         {groups.map(group => (
           <DataListItem key={group.id} id={group.id}>
             <DataListItemRow>
@@ -155,7 +156,7 @@ export function GroupsTab({ diagramName, onChange, onError }: Props) {
             </DataListItemRow>
           </DataListItem>
         ))}
-      </DataList>
+      </DataList>}
 
       <ConfirmDeleteModal
         isOpen={!!deleteTarget}

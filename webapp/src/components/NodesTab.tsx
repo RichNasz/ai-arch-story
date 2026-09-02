@@ -18,6 +18,9 @@ import {
   ModalFooter,
   ModalHeader,
   Label,
+  FormSection,
+  FormFieldGroupExpandable,
+  FormFieldGroupHeader,
 } from '@patternfly/react-core';
 import { PencilAltIcon, TrashIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import type { DiagramNode, ResolvedType } from '../types';
@@ -25,6 +28,7 @@ import { api } from '../api';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { StyleFields } from './StyleFields';
 import { MetadataFields } from './MetadataFields';
+import { ElementEmptyState } from './ElementEmptyState';
 
 interface Props {
   diagramName: string;
@@ -114,10 +118,10 @@ export function NodesTab({ diagramName, onChange, onError }: Props) {
 
   return (
     <>
-      <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
+      {nodes.length > 0 && <Button variant="link" icon={<PlusCircleIcon />} onClick={openAdd} style={{ marginBottom: '8px' }}>
         Add Node
-      </Button>
-      <DataList aria-label="Nodes" isCompact>
+      </Button>}
+      {nodes.length === 0 ? <ElementEmptyState title="No nodes yet" description="Add a node to start defining the architecture." actionLabel="Add node" onCreate={openAdd} /> : <DataList aria-label="Nodes" isCompact>
         {nodes.map(node => (
           <DataListItem key={node.id} id={node.id}>
             <DataListItemRow>
@@ -147,7 +151,7 @@ export function NodesTab({ diagramName, onChange, onError }: Props) {
             </DataListItemRow>
           </DataListItem>
         ))}
-      </DataList>
+      </DataList>}
 
       <ConfirmDeleteModal
         isOpen={!!deleteTarget}
@@ -166,6 +170,7 @@ export function NodesTab({ diagramName, onChange, onError }: Props) {
           <ModalHeader title={isNew ? 'Add Node' : `Edit: ${editNode.label}`} />
           <ModalBody>
             <Form>
+              <FormSection title="Basic details" titleElement="h2">
               {isNew && (
                 <FormGroup label="ID" fieldId="node-id">
                   <TextInput
@@ -195,6 +200,12 @@ export function NodesTab({ diagramName, onChange, onError }: Props) {
                   ))}
                 </FormSelect>
               </FormGroup>
+              </FormSection>
+              <FormFieldGroupExpandable
+                header={<FormFieldGroupHeader titleText={{ text: 'Appearance (optional)', id: 'node-appearance-heading' }} />}
+                isExpanded={false}
+                toggleAriaLabel="Appearance (optional)"
+              >
               <FormGroup label="Icon" fieldId="node-icon">
                 <TextInput
                   id="node-icon"
@@ -204,7 +215,14 @@ export function NodesTab({ diagramName, onChange, onError }: Props) {
                 />
               </FormGroup>
               <StyleFields idPrefix="node-style" value={editNode.style} includeShape onChange={style => setEditNode({ ...editNode, style })} />
+              </FormFieldGroupExpandable>
+              <FormFieldGroupExpandable
+                header={<FormFieldGroupHeader titleText={{ text: 'Metadata (optional)', id: 'node-metadata-heading' }} />}
+                isExpanded={false}
+                toggleAriaLabel="Metadata (optional)"
+              >
               <MetadataFields idPrefix="node" value={editNode.metadata} onChange={metadata => setEditNode({ ...editNode, metadata })} />
+              </FormFieldGroupExpandable>
             </Form>
           </ModalBody>
           <ModalFooter>

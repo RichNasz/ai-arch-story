@@ -5,6 +5,7 @@ import {
   EmptyStateActions,
   EmptyStateFooter,
   Button,
+  Alert,
 } from '@patternfly/react-core';
 import { EyeIcon } from '@patternfly/react-icons';
 import { api } from '../api';
@@ -13,9 +14,11 @@ interface Props {
   diagramName: string;
   refreshKey: number;
   hasOutput: boolean;
+  isStale: boolean;
+  onRender: () => Promise<boolean>;
 }
 
-export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
+export function PreviewPane({ diagramName, refreshKey, hasOutput, isStale, onRender }: Props) {
   const [hasRendered, setHasRendered] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +28,9 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
     setRendering(true);
     setError(null);
     try {
-      await api.render(diagramName);
-      setHasRendered(true);
+      if (await onRender()) {
+        setHasRendered(true);
+      }
     } catch (e) {
       setError(`${e}`);
     } finally {
@@ -39,7 +43,7 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <EmptyState headingLevel="h3" titleText="No preview available" icon={EyeIcon}>
           <EmptyStateBody>
-            {error ?? 'Click Export HTML in the toolbar to generate a preview and download it, or click below.'}
+            {error ?? 'Click Re-layout in the toolbar to generate a preview, or Export HTML to generate and download it.'}
           </EmptyStateBody>
           <EmptyStateFooter>
             <EmptyStateActions>
@@ -59,7 +63,9 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
   }
 
   return (
-    <iframe
+    <div style={{ height: '100%', minHeight: 0, position: 'relative' }}>
+      {isStale && <Alert isInline variant="info" title="Preview is out of date. Select Re-layout to update it." style={{ position: 'absolute', inset: '16px 16px auto', zIndex: 1 }} />}
+      <iframe
       src={previewUrl}
       title="Diagram Preview"
       style={{
@@ -67,7 +73,9 @@ export function PreviewPane({ diagramName, refreshKey, hasOutput }: Props) {
         height: '100%',
         border: 'none',
         backgroundColor: '#fff',
+        display: 'block',
       }}
-    />
+      />
+    </div>
   );
 }
