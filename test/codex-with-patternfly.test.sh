@@ -68,22 +68,22 @@ run_launcher() {
 test_starts_owned_container_and_passes_http_override() {
   echo 'test_starts_owned_container_and_passes_http_override'
   PODMAN_SCENARIO=absent run_launcher prompt
-  assert_contains 'podman run --rm -d --name ai-arch-story-patternfly-mcp'
-  assert_contains '-p 127.0.0.1:3030:8080'
-  assert_contains '--security-opt=no-new-privileges --cap-drop=ALL'
-  assert_contains '--http --host 0.0.0.0 --port 8080'
-  assert_contains 'curl -fsS -o /dev/null http://127.0.0.1:3030/mcp'
-  assert_contains 'codex -C '
+  assert_contains 'podman run\ --rm\ -d\ --name\ ai-arch-story-patternfly-mcp'
+  assert_contains '-p\ 127.0.0.1:3030:8080'
+  assert_contains '--security-opt=no-new-privileges\ --cap-drop=ALL'
+  assert_contains '--http\ --host\ 0.0.0.0\ --port\ 8080'
+  assert_contains 'curl -fsS\ -o\ /dev/null\ http://127.0.0.1:3030/mcp'
+  assert_contains 'codex -C\ '
   assert_contains 'mcp_servers.patternfly-mcp.url=\"http://127.0.0.1:3030/mcp\"'
-  assert_contains 'podman stop ai-arch-story-patternfly-mcp'
+  assert_contains 'podman stop\ ai-arch-story-patternfly-mcp'
 }
 
 test_reuses_conforming_container_without_stopping_it() {
   echo 'test_reuses_conforming_container_without_stopping_it'
   PODMAN_SCENARIO=compatible run_launcher prompt
-  assert_not_contains 'podman run '
-  assert_not_contains 'podman stop '
-  assert_contains 'codex -C '
+  assert_not_contains 'podman run\ '
+  assert_not_contains 'podman stop\ '
+  assert_contains 'codex -C\ '
 }
 
 test_rejects_conflicting_running_container_before_codex() {
@@ -94,7 +94,7 @@ test_rejects_conflicting_running_container_before_codex() {
     exit 1
   fi
   assert_not_contains 'codex '
-  assert_not_contains 'podman run '
+  assert_not_contains 'podman run\ '
 }
 
 test_preserves_codex_arguments_and_exit_status() {
@@ -107,8 +107,8 @@ test_preserves_codex_arguments_and_exit_status() {
     status=$?
   fi
   [[ "$status" -eq 17 ]]
-  assert_contains 'codex -C '
-  assert_contains '--model gpt-5.6-sol draw\\ PatternFly\\ cards'
+  assert_contains 'codex -C\ '
+  assert_contains '--model\ gpt-5.6-sol\ draw\ PatternFly\ cards'
 }
 
 test_starts_owned_container_and_passes_http_override
